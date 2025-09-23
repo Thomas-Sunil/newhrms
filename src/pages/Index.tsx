@@ -552,32 +552,6 @@ const Index = () => {
       ];
     }
 
-    if (isEmployee) {
-      return [
-        {
-          title: "Leave Balance",
-          value: "12 days",
-          change: { value: "Available", trend: "neutral" as const },
-          icon: Calendar,
-          variant: "primary" as const
-        },
-        {
-          title: "This Month",
-          value: "22 days",
-          change: { value: "Worked", trend: "up" as const },
-          icon: Clock,
-          variant: "secondary" as const
-        },
-        {
-          title: "Pending Requests",
-          value: (dashboardData.pendingLeaveRequests || 0).toString(),
-          change: { value: "In review", trend: "neutral" as const },
-          icon: FileText,
-          variant: "warning" as const
-        }
-      ];
-    }
-
     return baseStats;
   };
 

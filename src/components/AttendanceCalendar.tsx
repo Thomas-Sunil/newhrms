@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 
 export type AttendanceRecord = {
   date: Date;
-  status: 'Present' | 'Absent' | 'On Leave';
+  status: 'Present' | 'Absent' | 'On Leave' | 'No Record'; // Added 'No Record'
 };
 
 interface AttendanceCalendarProps {
@@ -27,18 +27,23 @@ const AttendanceCalendar = ({ attendanceRecords, month, onMonthChange }: Attenda
     onLeave: attendanceRecords
       .filter(r => r.status.toLowerCase() === 'on leave')
       .map(r => r.date),
+    noRecord: attendanceRecords // Added noRecord modifier
+      .filter(r => r.status.toLowerCase() === 'no record')
+      .map(r => r.date),
   };
 
   const modifierClassNames = {
     present: 'rdp-day_present',
     absent: 'rdp-day_absent',
     onLeave: 'rdp-day_onLeave',
+    noRecord: 'rdp-day_noRecord', // Added noRecord class name
   };
 
   const legendItems = [
     { status: 'Present', className: 'bg-green-500' },
     { status: 'Absent', className: 'bg-red-500' },
     { status: 'On Leave', className: 'bg-yellow-500' },
+    { status: 'No Record', className: 'bg-gray-300' }, // Added No Record to legend
   ];
 
   return (
@@ -55,6 +60,10 @@ const AttendanceCalendar = ({ attendanceRecords, month, onMonthChange }: Attenda
         .rdp-day_onLeave, .rdp-day_onLeave:hover {
           background-color: #fef9c3; /* yellow-200 */
           color: #854d0e; /* yellow-800 */
+        }
+        .rdp-day_noRecord, .rdp-day_noRecord:hover { /* New style for No Record */
+          background-color: #e0e0e0; /* gray-300 */
+          color: #424242; /* gray-800 */
         }
         .rdp-day_selected {
           background-color: hsl(var(--primary)) !important;

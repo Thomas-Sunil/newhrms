@@ -31,7 +31,7 @@ const EmployeeAttendanceCard = () => {
       const startOfMonth = new Date(month.getFullYear(), month.getMonth(), 1).toISOString();
       const endOfMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).toISOString();
 
-      const { data: attendanceRecords, error } = await supabase
+      const { data: attendanceRecords, error: attError } = await supabase
         .from('attendance')
         .select('*')
         .eq('emp_id', currentUser.emp_id)
@@ -39,22 +39,55 @@ const EmployeeAttendanceCard = () => {
         .lte('date', endOfMonth)
         .order('date', { ascending: true });
 
-      if (error) throw error;
+      if (attError) throw attError;
 
-      const formattedRecords: CalendarAttendanceRecord[] = (attendanceRecords || []).map(record => {
-        let status: 'Present' | 'Absent' | 'On Leave' = 'Absent'; // Default to Absent
+      // Fetch approved leave requests for the month
+      const { data: leaveRequests, error: leaveError } = await supabase
+        .from('leave_requests')
+        .select('start_date, end_date')
+        .eq('emp_id', currentUser.emp_id)
+        .in('status', ['approved', 'dept_approved', 'tl_approved']) // Consider all approved stages
+        .gte('start_date', startOfMonth)
+        .lte('end_date', endOfMonth);
 
-        if (record.status === 'present' || record.status === 'clocked_out') {
-          status = 'Present';
+      if (leaveError) throw leaveError;
+
+      const leaveDates = new Set<string>();
+      (leaveRequests || []).forEach(req => {
+        let currentDate = new Date(req.start_date);
+        const endDate = new Date(req.end_date);
+        while (currentDate <= endDate) {
+          leaveDates.add(currentDate.toISOString().split('T')[0]);
+          currentDate.setDate(currentDate.getDate() + 1);
         }
-        // To handle 'On Leave', we would need to fetch leave requests and cross-reference dates.
-        // For now, we'll stick to 'Present' and 'Absent' based on attendance table.
-
-        return {
-          date: new Date(record.date),
-          status: status,
-        };
       });
+
+      const formattedRecords: CalendarAttendanceRecord[] = [];
+      const allDaysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+
+      for (let i = 1; i <= allDaysInMonth; i++) {
+        const day = new Date(month.getFullYear(), month.getMonth(), i);
+        const dayString = day.toISOString().split('T')[0];
+        const attendanceRecord = (attendanceRecords || []).find(rec => rec.date === dayString);
+
+        let status: 'Present' | 'Absent' | 'On Leave' | 'No Record' = 'No Record'; // New default status
+
+        if (leaveDates.has(dayString)) {
+          status = 'On Leave';
+        } else if (attendanceRecord) {
+          if (attendanceRecord.status === 'present' || attendanceRecord.status === 'clocked_out') {
+            status = 'Present';
+          } else if (attendanceRecord.status === 'absent') { // Explicitly absent
+            status = 'Absent';
+          }
+        }
+        // If no attendanceRecord and not on leave, it remains 'No Record'
+
+        formattedRecords.push({
+          date: day,
+          status: status,
+        });
+      }
       setMonthlyAttendanceRecords(formattedRecords);
 
       // Also update today's attendance
