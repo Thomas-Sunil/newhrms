@@ -6,53 +6,86 @@ import { Clock, Calendar } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import AttendanceCalendar, { AttendanceRecord as CalendarAttendanceRecord } from "@/components/AttendanceCalendar"; // Import AttendanceCalendar
 
 const EmployeeAttendanceCard = () => {
   const [clockedIn, setClockedIn] = useState(false);
   const [todayAttendance, setTodayAttendance] = useState<any>(null);
+  const [monthlyAttendanceRecords, setMonthlyAttendanceRecords] = useState<CalendarAttendanceRecord[]>([]); // New state for monthly records
+  const [currentMonth, setCurrentMonth] = useState(new Date()); // New state for current month
   const [loading, setLoading] = useState(true);
   const { employee: currentUser } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
     if (currentUser) {
-      checkTodayAttendance();
+      fetchAttendanceData(currentMonth); // Fetch for current month
     }
-  }, [currentUser]);
+  }, [currentUser, currentMonth]); // Add currentMonth to dependency array
 
-  const checkTodayAttendance = async () => {
+  const fetchAttendanceData = async (month: Date) => {
     if (!currentUser?.emp_id) return;
-    
+
+    setLoading(true);
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const { data, error } = await supabase
+      const startOfMonth = new Date(month.getFullYear(), month.getMonth(), 1).toISOString();
+      const endOfMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).toISOString();
+
+      const { data: attendanceRecords, error } = await supabase
         .from('attendance')
         .select('*')
         .eq('emp_id', currentUser.emp_id)
-        .eq('date', today)
-        .maybeSingle();
+        .gte('date', startOfMonth)
+        .lte('date', endOfMonth)
+        .order('date', { ascending: true });
 
-      if (error && error.code !== 'PGRST116') { // Not found is ok
-        console.error('Attendance check error:', error);
-        return;
-      }
+      if (error) throw error;
 
-      setTodayAttendance(data);
-      setClockedIn(data?.clock_in && !data?.clock_out);
-    } catch (error) {
-      console.error('Attendance error:', error);
+      const formattedRecords: CalendarAttendanceRecord[] = (attendanceRecords || []).map(record => {
+        let status: 'Present' | 'Absent' | 'On Leave' = 'Absent'; // Default to Absent
+
+        if (record.status === 'present' || record.status === 'clocked_out') {
+          status = 'Present';
+        }
+        // To handle 'On Leave', we would need to fetch leave requests and cross-reference dates.
+        // For now, we'll stick to 'Present' and 'Absent' based on attendance table.
+
+        return {
+          date: new Date(record.date),
+          status: status,
+        };
+      });
+      setMonthlyAttendanceRecords(formattedRecords);
+
+      // Also update today's attendance
+      const today = new Date().toISOString().split('T')[0];
+      const todayRecord = attendanceRecords?.find(record => record.date === today);
+      setTodayAttendance(todayRecord);
+      setClockedIn(todayRecord?.clock_in && !todayRecord?.clock_out);
+
+    } catch (error: any) {
+      console.error('Error fetching monthly attendance:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch monthly attendance data",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
   };
 
+  const handleMonthChange = (newMonth: Date) => {
+    setCurrentMonth(newMonth);
+  };
+
   const handleClockIn = async () => {
     if (!currentUser?.emp_id) return;
-    
+
     try {
       const today = new Date().toISOString().split('T')[0];
       const now = new Date().toISOString();
-      
+
       const { error } = await supabase
         .from('attendance')
         .upsert({
@@ -65,7 +98,7 @@ const EmployeeAttendanceCard = () => {
       if (error) throw error;
 
       setClockedIn(true);
-      checkTodayAttendance(); // Refresh data
+      fetchAttendanceData(currentMonth); // Refresh data for the month
       toast({
         title: "Clocked In",
         description: "You have successfully clocked in for today"
@@ -82,11 +115,11 @@ const EmployeeAttendanceCard = () => {
 
   const handleClockOut = async () => {
     if (!currentUser?.emp_id) return;
-    
+
     try {
       const today = new Date().toISOString().split('T')[0];
       const now = new Date().toISOString();
-      
+
       const { error } = await supabase
         .from('attendance')
         .update({
@@ -99,9 +132,9 @@ const EmployeeAttendanceCard = () => {
       if (error) throw error;
 
       setClockedIn(false);
-      checkTodayAttendance(); // Refresh data
+      fetchAttendanceData(currentMonth); // Refresh data for the month
       toast({
-        title: "Clocked Out", 
+        title: "Clocked Out",
         description: "You have successfully clocked out"
       });
     } catch (error: any) {
@@ -116,14 +149,14 @@ const EmployeeAttendanceCard = () => {
 
   const getWorkingHours = () => {
     if (!todayAttendance?.clock_in) return '--';
-    
+
     const clockIn = new Date(todayAttendance.clock_in);
     const clockOut = todayAttendance.clock_out ? new Date(todayAttendance.clock_out) : new Date();
-    
+
     const diffMs = clockOut.getTime() - clockIn.getTime();
     const hours = Math.floor(diffMs / (1000 * 60 * 60));
     const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    
+
     return `${hours}h ${minutes}m`;
   };
 
@@ -144,74 +177,88 @@ const EmployeeAttendanceCard = () => {
       <CardHeader>
         <CardTitle className="flex items-center">
           <Calendar className="mr-2 h-5 w-5" />
-          Today's Attendance
+          My Attendance
         </CardTitle>
         <CardDescription>
-          Track your work hours for {new Date().toLocaleDateString()}
+          Overview of your attendance
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Status Badge */}
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium">Status:</span>
-          {clockedIn ? (
-            <Badge variant="default" className="bg-green-500 hover:bg-green-600">
-              <Clock className="mr-1 h-3 w-3" />
-              Clocked In
-            </Badge>
-          ) : todayAttendance?.clock_out ? (
-            <Badge variant="secondary">
-              <Clock className="mr-1 h-3 w-3" />
-              Clocked Out
-            </Badge>
-          ) : (
-            <Badge variant="destructive">
-              Not Clocked In
-            </Badge>
+        {/* Today's Attendance Summary */}
+        <div className="border-b pb-4">
+          <h3 className="text-lg font-semibold mb-2">Today's Status</h3>
+          {/* Status Badge */}
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium">Status:</span>
+            {clockedIn ? (
+              <Badge variant="default" className="bg-green-500 hover:bg-green-600">
+                <Clock className="mr-1 h-3 w-3" />
+                Clocked In
+              </Badge>
+            ) : todayAttendance?.clock_out ? (
+              <Badge variant="secondary">
+                <Clock className="mr-1 h-3 w-3" />
+                Clocked Out
+              </Badge>
+            ) : (
+              <Badge variant="destructive">
+                Not Clocked In
+              </Badge>
+            )}
+          </div>
+
+          {/* Time Details */}
+          {todayAttendance && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Clock In:</span>
+                <span className="text-sm font-medium">
+                  {todayAttendance.clock_in
+                    ? new Date(todayAttendance.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    : '--'
+                  }
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Clock Out:</span>
+                <span className="text-sm font-medium">
+                  {todayAttendance.clock_out
+                    ? new Date(todayAttendance.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    : '--'
+                  }
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Working Hours:</span>
+                <span className="text-sm font-medium">{getWorkingHours()}</span>
+              </div>
+            </div>
           )}
+
+          {/* Action Buttons */}
+          <div className="flex space-x-2 mt-4">
+            {clockedIn ? (
+              <Button onClick={handleClockOut} variant="outline" className="flex-1">
+                <Clock className="mr-2 h-4 w-4" />
+                Clock Out
+              </Button>
+            ) : (
+              <Button onClick={handleClockIn} className="flex-1">
+                <Clock className="mr-2 h-4 w-4" />
+                Clock In
+              </Button>
+            )}
+          </div>
         </div>
 
-        {/* Time Details */}
-        {todayAttendance && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Clock In:</span>
-              <span className="text-sm font-medium">
-                {todayAttendance.clock_in 
-                  ? new Date(todayAttendance.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                  : '--'
-                }
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Clock Out:</span>
-              <span className="text-sm font-medium">
-                {todayAttendance.clock_out 
-                  ? new Date(todayAttendance.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                  : '--'
-                }
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Working Hours:</span>
-              <span className="text-sm font-medium">{getWorkingHours()}</span>
-            </div>
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="flex space-x-2">
-          {clockedIn ? (
-            <Button onClick={handleClockOut} variant="outline" className="flex-1">
-              <Clock className="mr-2 h-4 w-4" />
-              Clock Out
-            </Button>
-          ) : (
-            <Button onClick={handleClockIn} className="flex-1">
-              <Clock className="mr-2 h-4 w-4" />
-              Clock In
-            </Button>
-          )}
+        {/* Monthly Attendance Calendar */}
+        <div className="pt-4">
+          <h3 className="text-lg font-semibold mb-2">Monthly View</h3>
+          <AttendanceCalendar
+            attendanceRecords={monthlyAttendanceRecords}
+            month={currentMonth}
+            onMonthChange={handleMonthChange}
+          />
         </div>
       </CardContent>
     </Card>

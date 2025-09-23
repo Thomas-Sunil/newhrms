@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { User, Edit, Save, X } from "lucide-react";
+import { User, Edit, Save, X, Eye, EyeOff } from "lucide-react"; // New imports for password visibility
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,8 +32,13 @@ const Profile = () => {
     email: employee?.email || "",
     phone: employee?.phone || "",
     address: employee?.address || "",
-    salary: employee?.salary?.toString() || ""
+    salary: employee?.salary?.toString() || "",
+    username: employee?.username || "" // Add username
   });
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false); // New state for password visibility
+  const [isPasswordLoading, setIsPasswordLoading] = useState(false); // New loading state for password change
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const { toast } = useToast();
 
@@ -67,7 +72,8 @@ const Profile = () => {
       email: employee?.email || "",
       phone: employee?.phone || "",
       address: employee?.address || "",
-      salary: employee?.salary?.toString() || ""
+      salary: employee?.salary?.toString() || "",
+      username: employee?.username || "" // Add username
     });
     setIsEditing(true);
   };
@@ -80,7 +86,8 @@ const Profile = () => {
       email: employee?.email || "",
       phone: employee?.phone || "",
       address: employee?.address || "",
-      salary: employee?.salary?.toString() || ""
+      salary: employee?.salary?.toString() || "",
+      username: employee?.username || "" // Add username
     });
   };
 
@@ -96,7 +103,8 @@ const Profile = () => {
           email: formData.email,
           phone: formData.phone,
           address: formData.address,
-          salary: formData.salary ? parseFloat(formData.salary) : null
+          salary: formData.salary ? parseFloat(formData.salary) : null,
+          username: formData.username // Add username
         })
         .eq('user_id', user?.id);
 
@@ -126,6 +134,45 @@ const Profile = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!newPassword || !confirmPassword) {
+      toast({ title: "Error", description: "Please enter and confirm your new password.", variant: "destructive" });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast({ title: "Error", description: "Passwords do not match.", variant: "destructive" });
+      return;
+    }
+    if (newPassword.length < 6) { // Basic password policy
+      toast({ title: "Error", description: "Password must be at least 6 characters long.", variant: "destructive" });
+      return;
+    }
+
+    setIsPasswordLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Password updated successfully."
+      });
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update password.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsPasswordLoading(false);
     }
   };
 
@@ -266,11 +313,54 @@ const Profile = () => {
                     />
                   ) : (
                     <p className="mt-1 text-sm text-muted-foreground">
-                      {employee?.salary ? `$${employee.salary.toLocaleString()}` : "Not set"}
+                      {employee?.salary ? `${employee.salary.toLocaleString()}` : "Not set"}
                     </p>
                   )}
                 </div>
               )}
+            </div>
+
+            {/* New Password Change Section */}
+            <div className="border-t pt-6">
+              <h3 className="text-lg font-semibold mb-4">Change Password</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="newPassword">New Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="newPassword"
+                      type={showPassword ? "text" : "password"}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      disabled={isPasswordLoading}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-1"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                  <Input
+                    id="confirmPassword"
+                    type={showPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    disabled={isPasswordLoading}
+                  />
+                </div>
+              </div>
+              <div className="mt-4">
+                <Button onClick={handleChangePassword} disabled={isPasswordLoading}>
+                  {isPasswordLoading ? "Changing..." : "Change Password"}
+                </Button>
+              </div>
             </div>
 
             <div className="border-t pt-6">

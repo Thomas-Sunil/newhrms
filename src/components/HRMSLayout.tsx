@@ -102,9 +102,9 @@ const HRMSLayout = ({ children }: { children: React.ReactNode }) => {
                 if (item.href === '/departments' || item.href === '/employees') {
                   return userRole === 'HR Manager' || userRole === 'CXO';
                 }
-                // Show Attendance and Leave Management to HR Managers, CXO, and Department Heads
+                // Show Attendance and Leave Management to HR Managers, CXO, Department Heads, and Team Leads
                 if (item.href === '/attendance' || item.href === '/leave-management') {
-                  return userRole === 'HR Manager' || userRole === 'CXO' || userRole === 'Department Head';
+                  return userRole === 'HR Manager' || userRole === 'CXO' || userRole === 'Department Head' || userRole === 'Team Lead';
                 }
                 
                 // Show Employment History only to HR Managers and CXO

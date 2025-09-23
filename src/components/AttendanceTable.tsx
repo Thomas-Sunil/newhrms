@@ -26,7 +26,11 @@ interface AttendanceRecord {
   total_hours: string;
 }
 
-const AttendanceTable = () => {
+interface AttendanceTableProps {
+  teamEmployees?: Employee[]; // New prop
+}
+
+const AttendanceTable = ({ teamEmployees }: AttendanceTableProps) => {
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const { employee: currentUser } = useAuth();
@@ -34,9 +38,14 @@ const AttendanceTable = () => {
 
   useEffect(() => {
     if (currentUser) {
-      fetchAttendanceData();
+      // If teamEmployees are provided, use them directly
+      if (teamEmployees && teamEmployees.length > 0) {
+        processAttendanceData(teamEmployees);
+      } else if (currentUser?.department_id) { // Fallback for Department Head if not passed
+        fetchAttendanceData();
+      }
     }
-  }, [currentUser]);
+  }, [currentUser, teamEmployees]); // Add teamEmployees to dependency array
 
   const fetchAttendanceData = async () => {
     try {
@@ -44,9 +53,11 @@ const AttendanceTable = () => {
       
       if (!currentUser?.department_id) {
         console.error('No department_id found for current user');
+        setLoading(false);
         return;
       }
 
+      console.log('AttendanceTable: Current User Department ID:', currentUser.department_id);
       // Get all employees in the department (simplified query)
       const { data: employees, error: empError } = await supabase
         .from('employees')
@@ -55,12 +66,29 @@ const AttendanceTable = () => {
         .eq('status', 'active')
         .order('first_name');
 
-      console.log('Employees fetch result:', { employees, empError });
       if (empError) throw empError;
+      processAttendanceData(employees || []);
+
+    } catch (error: any) {
+      console.error('Attendance fetch error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch attendance data",
+        variant: "destructive"
+      });
+      setLoading(false);
+    }
+  };
+
+  // New function to process attendance data from a given employee list
+  const processAttendanceData = async (employeesToProcess: Employee[]) => {
+    try {
+      setLoading(true);
+      console.log('AttendanceTable: employeesToProcess:', employeesToProcess); // Added log
 
       // Fetch role and designation data separately
-      const roleIds = Array.from(new Set((employees || []).map(e => e.role_id).filter(Boolean)));
-      const desigIds = Array.from(new Set((employees || []).map(e => e.designation_id).filter(Boolean)));
+      const roleIds = Array.from(new Set((employeesToProcess || []).map(e => e.role_id).filter(Boolean)));
+      const desigIds = Array.from(new Set((employeesToProcess || []).map(e => e.designation_id).filter(Boolean)));
 
       const [rolesRes, desigsRes] = await Promise.all([
         roleIds.length 
@@ -77,47 +105,57 @@ const AttendanceTable = () => {
       const roleMap = new Map((rolesRes.data || []).map(r => [r.role_id, r.role_name]));
       const desigMap = new Map((desigsRes.data || []).map(d => [d.designation_id, d.designation_name]));
 
-      // Get today's attendance records
+      // Get today's attendance records for the provided employees
       const today = new Date().toISOString().split('T')[0];
+      const employeeIds = employeesToProcess.map(emp => emp.emp_id); // Get IDs of employees to process
+      console.log('AttendanceTable: employeeIds for filtering attendance:', employeeIds); // Added log
+
       const { data: attendanceData, error: attError } = await supabase
         .from('attendance')
         .select('*')
-        .eq('date', today);
+        .eq('date', today)
+        .in('emp_id', employeeIds); // Filter attendance by these employee IDs
 
-      console.log('Attendance fetch result:', { attendanceData, attError });
+      console.log('AttendanceTable: Raw attendanceData from Supabase:', attendanceData); // Added log
       if (attError) console.error('Attendance error:', attError); // Non-blocking
 
       const attendanceMap = new Map((attendanceData || []).map(a => [a.emp_id, a]));
+      console.log('AttendanceTable: attendanceMap:', attendanceMap); // Added log
 
       // Generate attendance records
-      const attendanceRecords: AttendanceRecord[] = (employees || []).map(emp => {
+      const records: AttendanceRecord[] = (employeesToProcess || []).map(emp => {
         const attendance = attendanceMap.get(emp.emp_id);
         const designation = desigMap.get(emp.designation_id) || 'No designation';
-        
+
+        // Specific log for 'seee see' if found
+        if (emp.username === 'seee see') { // Assuming 'seee see' is the username
+          console.log(`AttendanceTable: Processing 'seee see' (emp_id: ${emp.emp_id})`);
+          console.log(`AttendanceTable: 'seee see' attendance object from map:`, attendance);
+        }
+
         let status: 'present' | 'absent' | 'clocked_out' = 'absent';
         let clockInTime = null;
         let clockOutTime = null;
         let totalHours = '--';
 
         if (attendance) {
-          status = attendance.status as any || 'present';
-          if (attendance.clock_in) {
-            clockInTime = new Date(attendance.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          }
-          if (attendance.clock_out) {
-            clockOutTime = new Date(attendance.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            status = 'clocked_out';
-          }
-          
           if (attendance.clock_in && attendance.clock_out) {
+            status = 'clocked_out';
+            clockInTime = new Date(attendance.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            clockOutTime = new Date(attendance.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             const diffMs = new Date(attendance.clock_out).getTime() - new Date(attendance.clock_in).getTime();
             const hours = Math.floor(diffMs / (1000 * 60 * 60));
             const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
             totalHours = `${hours}h ${minutes}m`;
           } else if (attendance.clock_in) {
-            totalHours = 'In Progress';
             status = 'present';
+            clockInTime = new Date(attendance.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            totalHours = 'In Progress';
+          } else {
+            status = 'absent'; // Should not happen if attendance record exists but no clock_in
           }
+        } else {
+          status = 'absent'; // No attendance record found for today
         }
 
         return {
@@ -131,13 +169,13 @@ const AttendanceTable = () => {
         };
       });
 
-      console.log('Final attendance records:', attendanceRecords);
-      setAttendanceRecords(attendanceRecords);
+      console.log('AttendanceTable: Final attendance records before setting state:', records); // Added log
+      setAttendanceRecords(records);
     } catch (error: any) {
-      console.error('Attendance fetch error:', error);
+      console.error('Attendance processing error:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch attendance data",
+        description: "Failed to process attendance data",
         variant: "destructive"
       });
     } finally {

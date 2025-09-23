@@ -69,11 +69,15 @@ const ApplyLeaveDialog = ({ open, onOpenChange, onSuccess }: ApplyLeaveDialogPro
     try {
       const totalDays = calculateDays(formData.startDate, formData.endDate);
       
-      let initialStatus = 'pending';
+      let initialStatus = 'pending_tl_review'; // Default for regular employees
       const applicantRole = employee?.roles?.role_name;
 
-      if (applicantRole === 'Department Head' || applicantRole === 'HR Manager' || applicantRole === 'CXO') {
-        initialStatus = 'dept_approved'; // Bypasses dept head approval, goes straight to HR
+      if (applicantRole === 'Team Lead') {
+        initialStatus = 'tl_approved'; // Team Lead auto-approves their own TL stage
+      } else if (applicantRole === 'Department Head') {
+        initialStatus = 'dept_approved'; // Department Head auto-approves TL and DH stages
+      } else if (applicantRole === 'HR Manager' || applicantRole === 'CXO') {
+        initialStatus = 'approved'; // HR/CXO auto-approves all stages
       }
 
       const { error } = await supabase

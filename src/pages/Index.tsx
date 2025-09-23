@@ -97,7 +97,8 @@ const Index = () => {
   const userRole = employee?.roles?.role_name;
   const isHROrCXO = userRole === 'HR Manager' || userRole === 'CXO';
   const isDeptHead = userRole === 'Department Head';
-  const isEmployee = userRole === 'Employee' || userRole === 'Team Lead';
+  const isTeamLead = userRole === 'Team Lead'; // New flag
+  const isEmployee = userRole === 'Employee' || userRole === 'Team Lead'; // Modified to include Team Lead
 
   // Check if CEO exists in database
   const checkCEOExists = async () => {
@@ -303,6 +304,7 @@ const Index = () => {
       }
 
       if (isDeptHead && employee?.department_id) {
+        console.log('Index Page: Dept Head - Current User Department ID:', employee.department_id);
         // Department Head: Get team data and leaves
         const [teamRes, leavesRes] = await Promise.all([
           supabase
@@ -310,17 +312,17 @@ const Index = () => {
             .select('*')
             .eq('department_id', employee.department_id)
             .eq('status', 'active')
-            .neq('emp_id', employee.emp_id)
             .order('first_name'),
           
           supabase
             .from('leave_requests')
             .select(`*, employees!leave_requests_emp_id_fkey(first_name, last_name, username)`)
-            .in('status', ['pending', 'dept_approved'])
+            .eq('status', 'tl_approved') // Department Heads review tl_approved
             .order('created_at', { ascending: false })
         ]);
 
         if (!teamRes.error) {
+          console.log('Index Page: Dept Head - Team Employees Data:', teamRes.data);
           const teamLeaves = (leavesRes.data || []).filter((leave: any) =>
             (teamRes.data || []).some((emp: any) => emp.emp_id === leave.emp_id)
           );
@@ -333,6 +335,46 @@ const Index = () => {
           };
         }
       }
+
+      if (isTeamLead && employee?.emp_id) { // New block for Team Lead
+  console.log('Index Page: Team Lead - Current User Employee ID:', employee.emp_id);
+  // Team Lead: Get team data (employees reporting to this lead) and leaves
+  const [teamRes, leavesRes] = await Promise.all([
+    supabase
+      .from('employees')
+      .select(`
+        *,
+        roles!role_id(role_name),
+        designations!designation_id(designation_name),
+        departments!department_id(dept_name)
+      `)
+      .eq('reporting_manager_id', employee.emp_id) // Filter by reporting_manager_id
+      .eq('status', 'active')
+      .order('first_name'),
+
+    supabase
+      .from('leave_requests')
+      .select(`*, employees!leave_requests_emp_id_fkey(first_name, last_name, username)`)
+      .eq('status', 'pending_tl_review') // Team Leads review pending_tl_review
+      .order('created_at', { ascending: false })
+  ]);
+
+  if (!teamRes.error) {
+    console.log('Index Page: Team Lead - Fetched Team Employees Data (teamRes.data):', teamRes.data);
+    const teamLeaves = (leavesRes.data || []).filter((leave: any) =>
+      (teamRes.data || []).some((emp: any) => emp.emp_id === leave.emp_id)
+    );
+    setPendingLeaves(teamLeaves);
+    setEmployees(teamRes.data || []); // This sets the 'employees' state that is passed to AttendanceTable
+    console.log('Index Page: Team Lead - Employees state after setEmployees:', employees);
+
+    additionalData = {
+      teamMembers: (teamRes.data || []).length,
+      presentToday: Math.floor((teamRes.data || []).length * 0.8), // Placeholder for now
+      pendingLeaveRequests: teamLeaves.filter((leave: any) => leave.status === 'pending').length
+    };
+  }
+}
 
       if (isEmployee) {
         // Employee: Get own leave data
@@ -484,6 +526,32 @@ const Index = () => {
       ];
     }
 
+    if (isTeamLead) { // New block for Team Lead
+      return [
+        {
+          title: "Team Members",
+          value: (dashboardData.teamMembers || 0).toString(),
+          change: { value: "Your team", trend: "neutral" as const },
+          icon: Users,
+          variant: "primary" as const
+        },
+        {
+          title: "Present Today",
+          value: (dashboardData.presentToday || 0).toString(),
+          change: { value: "Active now", trend: "up" as const },
+          icon: UserCheck,
+          variant: "secondary" as const
+        },
+        {
+          title: "Pending Requests",
+          value: (dashboardData.pendingLeaveRequests || 0).toString(),
+          change: { value: "Need review", trend: "neutral" as const },
+          icon: FileText,
+          variant: "warning" as const
+        }
+      ];
+    }
+
     if (isEmployee) {
       return [
         {
@@ -525,6 +593,7 @@ const Index = () => {
             <h1 className="text-3xl font-bold">
               {isHROrCXO ? 'Executive Dashboard' : 
                isDeptHead ? 'Department Head Dashboard' : 
+               isTeamLead ? 'Team Lead Dashboard' : 
                'Employee Dashboard'}
             </h1>
             <p className="text-muted-foreground">
@@ -727,7 +796,83 @@ const Index = () => {
             </div>
 
             {/* Team Attendance */}
-            <AttendanceTable />
+            <AttendanceTable teamEmployees={employees} />
+          </>
+        )}
+
+        {isTeamLead && ( // New block for Team Lead Content
+          <>
+            {/* Team Lead Content - Mirroring Department Head for now */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Calendar className="mr-2 h-5 w-5" />
+                    Pending Leave Requests
+                  </CardTitle>
+                  <CardDescription>
+                    Leave requests requiring your review
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {pendingLeaves.filter(leave => leave.status === 'pending').length > 0 ? (
+                    pendingLeaves
+                      .filter(leave => leave.status === 'pending')
+                      .slice(0, 5)
+                      .map((leave) => (
+                        <div key={leave.leave_id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div>
+                            <p className="font-medium">
+                              {leave.employees?.first_name} {leave.employees?.last_name}
+                            </p>
+                            <p className="text-sm text-muted-foreground capitalize">
+                              {leave.leave_type} - {leave.total_days} days
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(leave.start_date).toLocaleDateString()} - {new Date(leave.end_date).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleOpenReviewDialog(leave)}
+                          >
+                            Review
+                          </Button>
+                        </div>
+                      ))
+                  ) : (
+                    <div className="text-sm text-muted-foreground text-center py-4">
+                      No pending leave requests
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Users className="mr-2 h-5 w-5" />
+                    Your Team
+                  </CardTitle>
+                  <CardDescription>
+                    Team overview
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-8">
+                    <Users className="mx-auto h-12 w-12 text-muted-foreground" />
+                    <h3 className="mt-2 text-sm font-semibold">Team Overview</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {dashboardData.teamMembers || 0} team members • {dashboardData.presentToday || 0} present today
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Team Attendance */}
+            <AttendanceTable teamEmployees={employees} />
           </>
         )}
 
@@ -775,41 +920,17 @@ const Index = () => {
         )}
 
         {/* Common sections for all authenticated users */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <TrendingUp className="mr-2 h-5 w-5 text-primary" />
-                Recent Activity
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                  <span className="text-sm">You clocked in</span>
-                  <span className="text-xs text-muted-foreground">Today</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                  <span className="text-sm">Profile updated</span>
-                  <span className="text-xs text-muted-foreground">2 days ago</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                  <span className="text-sm">Welcome to HRMS Pro!</span>
-                  <span className="text-xs text-muted-foreground">1 week ago</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        {!isTeamLead && ( // Hide for Team Leads
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Users className="mr-2 h-5 w-5 text-secondary" />
-                Department Overview
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Users className="mr-2 h-5 w-5 text-secondary" />
+                  Department Overview
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
                 {dashboardData.departmentData.length > 0 ? (
                   dashboardData.departmentData.map((dept, index) => (
                     <div key={index} className="flex items-center justify-between">
@@ -820,10 +941,10 @@ const Index = () => {
                 ) : (
                   <div className="text-sm text-muted-foreground">No department data available</div>
                 )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Dialogs */}
         {isHROrCXO && (
@@ -851,6 +972,16 @@ const Index = () => {
             leaveRequest={selectedLeave}
             onSuccess={fetchData}
             reviewType="dept_head"
+          />
+        )}
+
+        {isTeamLead && ( // Added for Team Lead
+          <LeaveReviewDialog
+            open={reviewDialogOpen}
+            onOpenChange={setReviewDialogOpen}
+            leaveRequest={selectedLeave}
+            onSuccess={fetchData}
+            reviewType="team_lead" // Assuming a new reviewType for Team Lead
           />
         )}
       </div>

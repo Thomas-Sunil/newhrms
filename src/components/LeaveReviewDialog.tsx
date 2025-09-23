@@ -29,7 +29,7 @@ interface LeaveReviewDialogProps {
   onOpenChange: (open: boolean) => void;
   leaveRequest: LeaveRequest | null;
   onSuccess: () => void;
-  reviewType: 'dept_head' | 'hr';
+  reviewType: 'team_lead' | 'dept_head' | 'hr';
 }
 
 const LeaveReviewDialog = ({ open, onOpenChange, leaveRequest, onSuccess, reviewType }: LeaveReviewDialogProps) => {
@@ -45,22 +45,34 @@ const LeaveReviewDialog = ({ open, onOpenChange, leaveRequest, onSuccess, review
     
     try {
       let updateData: any = {};
-      
-      if (reviewType === 'dept_head') {
-        updateData = {
-          status: action === 'approve' ? 'dept_approved' : 'rejected',
-          dept_head_comments: comments,
-          reviewed_by_dept_head: employee?.emp_id,
-          dept_review_date: new Date().toISOString()
-        };
-      } else {
-        updateData = {
-          status: action === 'approve' ? 'approved' : 'rejected',
-          hr_comments: comments,
-          reviewed_by_hr: employee?.emp_id,
-          hr_review_date: new Date().toISOString()
-        };
+      let newStatus: string;
+      let commentsField: string;
+      let reviewerField: string;
+      let reviewDateField: string;
+
+      if (reviewType === 'team_lead') {
+        newStatus = action === 'approve' ? 'tl_approved' : 'tl_rejected';
+        commentsField = 'team_lead_comments';
+        reviewerField = 'reviewed_by_team_lead';
+        reviewDateField = 'tl_review_date';
+      } else if (reviewType === 'dept_head') {
+        newStatus = action === 'approve' ? 'dept_approved' : 'dept_rejected';
+        commentsField = 'dept_head_comments';
+        reviewerField = 'reviewed_by_dept_head';
+        reviewDateField = 'dept_review_date';
+      } else { // reviewType === 'hr'
+        newStatus = action === 'approve' ? 'approved' : 'rejected';
+        commentsField = 'hr_comments';
+        reviewerField = 'reviewed_by_hr';
+        reviewDateField = 'hr_review_date';
       }
+
+      updateData = {
+        status: newStatus,
+        [commentsField]: comments,
+        [reviewerField]: employee?.emp_id,
+        [reviewDateField]: new Date().toISOString()
+      };
 
       const { error } = await supabase
         .from('leave_requests')
@@ -91,14 +103,17 @@ const LeaveReviewDialog = ({ open, onOpenChange, leaveRequest, onSuccess, review
   if (!leaveRequest) return null;
 
   const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      pending: { label: "Pending", variant: "secondary" as const },
-      dept_approved: { label: "Dept Approved", variant: "default" as const },
-      approved: { label: "Approved", variant: "default" as const },
-      rejected: { label: "Rejected", variant: "destructive" as const }
+    const statusConfig: { [key: string]: { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' } } = {
+      pending_tl_review: { label: "Pending TL Review", variant: "secondary" },
+      tl_approved: { label: "TL Approved", variant: "default" },
+      tl_rejected: { label: "TL Rejected", variant: "destructive" },
+      dept_approved: { label: "Dept Approved", variant: "default" },
+      dept_rejected: { label: "Dept Rejected", variant: "destructive" },
+      approved: { label: "Approved", variant: "default" },
+      rejected: { label: "Rejected", variant: "destructive" }
     };
-    
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
+
+    const config = statusConfig[status] || { label: "Unknown", variant: "outline" };
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
@@ -107,7 +122,8 @@ const LeaveReviewDialog = ({ open, onOpenChange, leaveRequest, onSuccess, review
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>
-            {reviewType === 'dept_head' ? 'Department Head Review' : 'HR Review'} - Leave Request
+            {reviewType === 'team_lead' ? 'Team Lead Review' :
+             reviewType === 'dept_head' ? 'Department Head Review' : 'HR Review'} - Leave Request
           </DialogTitle>
           <DialogDescription>
             Review and approve/reject the leave request
@@ -162,7 +178,8 @@ const LeaveReviewDialog = ({ open, onOpenChange, leaveRequest, onSuccess, review
 
           <div>
             <Label htmlFor="comments">
-              {reviewType === 'dept_head' ? 'Department Head Comments' : 'HR Comments'} (Optional)
+              {reviewType === 'team_lead' ? 'Team Lead Comments' :
+               reviewType === 'dept_head' ? 'Department Head Comments' : 'HR Comments'} (Optional)
             </Label>
             <Textarea
               id="comments"

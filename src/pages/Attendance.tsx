@@ -5,12 +5,17 @@ import AttendanceCalendar, { AttendanceRecord } from '@/components/AttendanceCal
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Employee {
   emp_id: string;
   first_name: string;
   last_name: string;
+  department_id?: string;
+  reporting_manager_id?: string;
 }
+
+const TOP_LEVEL_ROLES = ['Department Head', 'HR Manager', 'CXO'];
 
 const Attendance = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -18,23 +23,54 @@ const Attendance = () => {
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [loading, setLoading] = useState(false);
+  const { employee: currentUser } = useAuth();
+
+  const userRole = currentUser?.roles?.role_name;
+  const isHROrCXO = userRole === 'HR Manager' || userRole === 'CXO';
+  const isDeptHead = userRole === 'Department Head';
+  const isTeamLead = userRole === 'Team Lead';
+  const isRegularEmployee = userRole === 'Employee';
 
   useEffect(() => {
     const fetchEmployees = async () => {
-      const { data } = await supabase
+      if (!currentUser) return;
+
+      let query = supabase
         .from('employees')
-        .select('emp_id, first_name, last_name')
+        .select('emp_id, first_name, last_name, department_id, reporting_manager_id')
         .order('first_name');
+
+      if (isHROrCXO) {
+        // HR/CXO sees all employees
+      } else if (isDeptHead && currentUser.department_id) {
+        // Department Head sees employees in their department
+        query = query.eq('department_id', currentUser.department_id);
+      } else if (isTeamLead && currentUser.emp_id) {
+        // Team Lead sees employees reporting to them
+        query = query.eq('reporting_manager_id', currentUser.emp_id);
+      } else if (isRegularEmployee && currentUser.emp_id) {
+        // Regular employee sees only themselves
+        query = query.eq('emp_id', currentUser.emp_id);
+      } else {
+        // Fallback for unhandled roles or missing data
+        setEmployees([]);
+        setSelectedEmployeeId(null);
+        return;
+      }
+
+      const { data, error } = await query;
       
       if (data) {
         setEmployees(data);
         if (data.length > 0 && !selectedEmployeeId) {
           setSelectedEmployeeId(data[0].emp_id);
+        } else if (data.length === 0) {
+          setSelectedEmployeeId(null);
         }
       }
     };
     fetchEmployees();
-  }, [selectedEmployeeId]);
+  }, [currentUser, isHROrCXO, isDeptHead, isTeamLead, isRegularEmployee, selectedEmployeeId]);
 
   useEffect(() => {
     if (!selectedEmployeeId) return;
@@ -47,7 +83,7 @@ const Attendance = () => {
       // 1. Fetch regular attendance records
       const { data: attendanceData, error: attendanceError } = await supabase
         .from('attendance')
-        .select('date, status, clock_out') // Fetch clock_out
+        .select('date, status, clock_out') 
         .eq('emp_id', selectedEmployeeId)
         .gte('date', format(startDate, 'yyyy-MM-dd'))
         .lte('date', format(endDate, 'yyyy-MM-dd'));
@@ -87,7 +123,6 @@ const Attendance = () => {
       if (attendanceData) {
         attendanceData.forEach(att => {
           if (!recordsMap.has(att.date)) {
-            // If clock_out exists, they were present. Otherwise, use the recorded status.
             const finalStatus = att.clock_out ? 'Present' : att.status;
             recordsMap.set(att.date, { date: new Date(att.date), status: finalStatus as any });
           }
