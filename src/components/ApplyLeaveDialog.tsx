@@ -69,6 +69,13 @@ const ApplyLeaveDialog = ({ open, onOpenChange, onSuccess }: ApplyLeaveDialogPro
     try {
       const totalDays = calculateDays(formData.startDate, formData.endDate);
       
+      let initialStatus = 'pending';
+      const applicantRole = employee?.roles?.role_name;
+
+      if (applicantRole === 'Department Head' || applicantRole === 'HR Manager' || applicantRole === 'CXO') {
+        initialStatus = 'dept_approved'; // Bypasses dept head approval, goes straight to HR
+      }
+
       const { error } = await supabase
         .from('leave_requests')
         .insert({
@@ -78,7 +85,7 @@ const ApplyLeaveDialog = ({ open, onOpenChange, onSuccess }: ApplyLeaveDialogPro
           end_date: formData.endDate,
           total_days: totalDays,
           reason: formData.reason,
-          status: 'pending'
+          status: initialStatus
         });
 
       if (error) throw error;

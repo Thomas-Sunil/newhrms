@@ -22,12 +22,17 @@ interface LeaveRequest {
     username: string;
     departments: {
       dept_name: string;
-    }
+    };
+    roles: {
+      role_name: string;
+    };
   };
   leave_types: {
     leave_name: string;
   }
 }
+
+const TOP_LEVEL_ROLES = ['Department Head', 'HR Manager', 'CXO'];
 
 const LeaveManagement = () => {
   const { employee } = useAuth();
@@ -46,7 +51,7 @@ const LeaveManagement = () => {
       .from('leave_requests')
       .select(`
         *,
-        employees!leave_requests_emp_id_fkey!inner(*, departments!employees_department_id_fkey!inner(dept_name)),
+        employees!leave_requests_emp_id_fkey!inner(*, departments!employees_department_id_fkey!inner(dept_name), roles!role_id(role_name)),
         leave_types!inner(leave_name)
       `);
 
@@ -86,7 +91,8 @@ const LeaveManagement = () => {
   const getReviewType = () => {
     if (!selectedRequest) return 'hr';
     if (isHR && selectedRequest.status === 'dept_approved') return 'hr';
-    if (isHR && selectedRequest.status === 'pending') return 'dept_head'; 
+    // If HR is reviewing a pending request from a top-level role, they act as dept head
+    if (isHR && selectedRequest.status === 'pending' && selectedRequest.employees.roles?.role_name && TOP_LEVEL_ROLES.includes(selectedRequest.employees.roles.role_name)) return 'hr';
     if (isDeptHead) return 'dept_head';
     return 'hr'; 
   };
@@ -120,7 +126,9 @@ const LeaveManagement = () => {
               <p className="text-sm text-muted-foreground mt-2">Reason: {req.reason}</p>
               <div className="flex items-center justify-between mt-4">
                 {getStatusBadge(req.status)}
-                {(isDeptHead && req.status === 'pending') || (isHR && req.status === 'dept_approved') || (isHR && req.status === 'pending') ? (
+                {(isDeptHead && req.status === 'pending') || 
+                 (isHR && (req.status === 'dept_approved' || 
+                           (req.status === 'pending' && req.employees.roles?.role_name && TOP_LEVEL_ROLES.includes(req.employees.roles.role_name)))) ? (
                   <Button size="sm" onClick={() => handleReview(req)}>Review</Button>
                 ) : null}
               </div>
@@ -132,7 +140,7 @@ const LeaveManagement = () => {
   };
 
   const deptPendingRequests = requests.filter(r => r.status === 'pending' && r.employees.departments.dept_name === employee?.departments?.dept_name);
-  const hrPendingRequests = requests.filter(r => r.status === 'dept_approved');
+  const hrPendingRequests = requests.filter(r => r.status === 'dept_approved' || (r.status === 'pending' && r.employees.roles?.role_name && TOP_LEVEL_ROLES.includes(r.employees.roles.role_name)));
   const allRequests = requests;
 
   return (
@@ -157,7 +165,7 @@ const LeaveManagement = () => {
           )}
           {isHR && (
             <TabsContent value="hr">
-              <p className="text-sm text-muted-foreground mb-4">Requests approved by Department Heads, awaiting final HR approval.</p>
+              <p className="text-sm text-muted-foreground mb-4">Requests approved by Department Heads, or submitted by top-level roles, awaiting HR approval.</p>
               {renderRequestList(hrPendingRequests, "No requests pending HR approval.")}
             </TabsContent>
           )}
