@@ -1,0 +1,135 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* HRMS Design System - Professional Enterprise Theme
+All colors MUST be HSL for proper theming support.
+*/
+
+@layer base {
+  :root {
+    /* Core Background & Surface Colors */
+    --background: 220 14% 96%;  /* Soft Gray #F3F4F6 */
+    --foreground: 220 15% 15%;  /* Dark text for contrast */
+
+    --card: 0 0% 100%;          /* Pure white cards */
+    --card-foreground: 220 15% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 15% 15%;
+
+    /* Primary Brand Colors - Navy Blue */
+    --primary: 218 70% 30%;     /* Navy Blue #1E3A8A */ 
+    --primary-foreground: 0 0% 100%;  /* White text on navy */
+    --primary-glow: 218 70% 40%; /* Lighter navy for effects */
+
+    /* Secondary Brand Colors - Teal */
+    --secondary: 173 77% 40%;   /* Teal #14B8A6 */
+    --secondary-foreground: 0 0% 100%;
+    --secondary-glow: 173 77% 50%; /* Lighter teal */
+
+    /* Neutral Tones */
+    --muted: 220 14% 92%;       /* Light gray backgrounds */
+    --muted-foreground: 220 9% 46%;
+
+    --accent: 173 77% 40%;      /* Teal accent */
+    --accent-foreground: 0 0% 100%;
+
+    /* Status Colors */
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --success: 142 71% 45%;     /* Green for success states */
+    --success-foreground: 0 0% 100%;
+    
+    --warning: 45 93% 47%;      /* Amber for warnings */
+    --warning-foreground: 0 0% 100%;
+
+    /* UI Elements */
+    --border: 220 13% 88%;      /* Subtle borders */
+    --input: 220 13% 88%;       /* Input borders */
+    --ring: 173 77% 40%;        /* Focus rings in teal */
+
+    /* Design System Tokens */
+    --radius: 0.75rem;          /* Rounded corners */
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(218 70% 30%), hsl(218 70% 40%));
+    --gradient-secondary: linear-gradient(135deg, hsl(173 77% 40%), hsl(173 77% 50%));
+    --gradient-hero: linear-gradient(135deg, hsl(218 70% 30%), hsl(173 77% 40%));
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(220 14% 98%));
+    
+    /* Shadows */
+    --shadow-elegant: 0 4px 20px -4px hsl(218 70% 30% / 0.15);
+    --shadow-card: 0 2px 10px -2px hsl(218 70% 30% / 0.1);
+    --shadow-glow: 0 0 30px hsl(173 77% 40% / 0.3);
+    
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
