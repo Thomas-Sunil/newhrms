@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { User, Edit, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,19 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import HRMSLayout from "@/components/HRMSLayout";
 import { useAuth } from "@/contexts/AuthContext";
+import { Badge } from "@/components/ui/badge";
+
+interface LeaveRequest {
+  leave_id: string;
+  start_date: string;
+  end_date: string;
+  total_days: number;
+  reason: string;
+  status: string;
+  leave_types: {
+    leave_name: string;
+  };
+}
 
 const Profile = () => {
   const { employee, user } = useAuth();
@@ -21,9 +34,31 @@ const Profile = () => {
     address: employee?.address || "",
     salary: employee?.salary?.toString() || ""
   });
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const { toast } = useToast();
 
   const canManageSalary = employee?.roles?.role_name === 'HR Manager' || employee?.roles?.role_name === 'CXO';
+
+  useEffect(() => {
+    const fetchLeaveRequests = async () => {
+      if (!employee?.emp_id) return;
+      const { data, error } = await supabase
+        .from('leave_requests')
+        .select(`
+          *,
+          leave_types(leave_name)
+        `)
+        .eq('emp_id', employee.emp_id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error("Error fetching leave requests:", error);
+      } else {
+        setLeaveRequests(data as LeaveRequest[]);
+      }
+    };
+    fetchLeaveRequests();
+  }, [employee?.emp_id]);
 
   const handleEdit = () => {
     setFormData({
@@ -92,6 +127,18 @@ const Profile = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      pending: { label: "Pending", variant: "secondary" as const },
+      dept_approved: { label: "Dept Approved", variant: "default" as const },
+      approved: { label: "Approved", variant: "default" as const },
+      rejected: { label: "Rejected", variant: "destructive" as const }
+    };
+    
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
+    return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
   return (
@@ -219,7 +266,7 @@ const Profile = () => {
                     />
                   ) : (
                     <p className="mt-1 text-sm text-muted-foreground">
-                      {employee?.salary ? `${employee.salary.toLocaleString()}` : "Not set"}
+                      {employee?.salary ? `$${employee.salary.toLocaleString()}` : "Not set"}
                     </p>
                   )}
                 </div>
@@ -248,6 +295,30 @@ const Profile = () => {
                   </p>
                 </div>
               </div>
+            </div>
+
+            <div className="border-t pt-6">
+              <h3 className="text-lg font-semibold mb-4">My Leave Requests</h3>
+              {leaveRequests.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No leave requests found.</p>
+              ) : (
+                <div className="space-y-3">
+                  {leaveRequests.map(req => (
+                    <Card key={req.leave_id} className="p-3">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="text-sm font-medium">{req.leave_types.leave_name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(req.start_date).toLocaleDateString()} - {new Date(req.end_date).toLocaleDateString()} ({req.total_days} days)
+                          </p>
+                        </div>
+                        {getStatusBadge(req.status)}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">Reason: {req.reason}</p>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

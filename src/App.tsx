@@ -11,6 +11,7 @@ import Employees from "./pages/Employees";
 import Profile from "./pages/Profile";
 import Policies from "./pages/Policies";
 import Attendance from "./pages/Attendance";
+import LeaveManagement from "./pages/LeaveManagement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,6 +38,11 @@ const App = () => (
           <Route path="/attendance" element={
             <ProtectedRoute>
               <Attendance />
+            </ProtectedRoute>
+          } />
+          <Route path="/leave-management" element={
+            <ProtectedRoute>
+              <LeaveManagement />
             </ProtectedRoute>
           } />
           <Route path="/profile" element={

@@ -853,14 +853,6 @@ const Index = () => {
             reviewType="dept_head"
           />
         )}
-
-        {isEmployee && (
-          <ApplyLeaveDialog
-            open={leaveDialogOpen}
-            onOpenChange={setLeaveDialogOpen}
-            onSuccess={fetchData}
-          />
-        )}
       </div>
     </HRMSLayout>
   );

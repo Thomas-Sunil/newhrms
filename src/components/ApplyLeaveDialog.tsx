@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -15,16 +15,32 @@ interface ApplyLeaveDialogProps {
   onSuccess: () => void;
 }
 
+interface LeaveType {
+  leave_type_id: string;
+  leave_name: string;
+}
+
 const ApplyLeaveDialog = ({ open, onOpenChange, onSuccess }: ApplyLeaveDialogProps) => {
   const [formData, setFormData] = useState({
-    leaveType: "",
+    leave_type_id: "",
     startDate: "",
     endDate: "",
     reason: ""
   });
+  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const { employee } = useAuth();
+
+  useEffect(() => {
+    const fetchLeaveTypes = async () => {
+      const { data, error } = await supabase.from('leave_types').select('*');
+      if (data) setLeaveTypes(data);
+    };
+    if (open) {
+      fetchLeaveTypes();
+    }
+  }, [open]);
 
   const calculateDays = (start: string, end: string) => {
     if (!start || !end) return 0;
@@ -38,21 +54,13 @@ const ApplyLeaveDialog = ({ open, onOpenChange, onSuccess }: ApplyLeaveDialogPro
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.leaveType || !formData.startDate || !formData.endDate || !formData.reason) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive"
-      });
+    if (!formData.leave_type_id || !formData.startDate || !formData.endDate || !formData.reason) {
+      toast({ title: "Error", description: "Please fill in all required fields", variant: "destructive" });
       return;
     }
 
     if (new Date(formData.startDate) > new Date(formData.endDate)) {
-      toast({
-        title: "Error",
-        description: "End date must be after start date",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "End date must be after start date", variant: "destructive" });
       return;
     }
 
@@ -65,7 +73,7 @@ const ApplyLeaveDialog = ({ open, onOpenChange, onSuccess }: ApplyLeaveDialogPro
         .from('leave_requests')
         .insert({
           emp_id: employee?.emp_id,
-          leave_type: formData.leaveType,
+          leave_type_id: formData.leave_type_id,
           start_date: formData.startDate,
           end_date: formData.endDate,
           total_days: totalDays,
@@ -75,25 +83,13 @@ const ApplyLeaveDialog = ({ open, onOpenChange, onSuccess }: ApplyLeaveDialogPro
 
       if (error) throw error;
 
-      toast({
-        title: "Success",
-        description: "Leave request submitted successfully"
-      });
+      toast({ title: "Success", description: "Leave request submitted successfully" });
       
-      setFormData({
-        leaveType: "",
-        startDate: "",
-        endDate: "",
-        reason: ""
-      });
+      setFormData({ leave_type_id: "", startDate: "", endDate: "", reason: "" });
       onOpenChange(false);
       onSuccess();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Failed to submit leave request",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: error.message || "Failed to submit leave request", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -106,23 +102,20 @@ const ApplyLeaveDialog = ({ open, onOpenChange, onSuccess }: ApplyLeaveDialogPro
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Apply for Leave</DialogTitle>
-          <DialogDescription>
-            Submit a new leave request for approval
-          </DialogDescription>
+          <DialogDescription>Submit a new leave request for approval</DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="leaveType">Leave Type *</Label>
-            <Select value={formData.leaveType} onValueChange={(value) => setFormData(prev => ({ ...prev, leaveType: value }))}>
+            <Label htmlFor="leave_type_id">Leave Type *</Label>
+            <Select value={formData.leave_type_id} onValueChange={(value) => setFormData(prev => ({ ...prev, leave_type_id: value }))}>
               <SelectTrigger>
                 <SelectValue placeholder="Select leave type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="sick">Sick Leave</SelectItem>
-                <SelectItem value="vacation">Vacation</SelectItem>
-                <SelectItem value="personal">Personal Leave</SelectItem>
-                <SelectItem value="emergency">Emergency Leave</SelectItem>
+                {leaveTypes.map(lt => (
+                  <SelectItem key={lt.leave_type_id} value={lt.leave_type_id}>{lt.leave_name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -153,9 +146,7 @@ const ApplyLeaveDialog = ({ open, onOpenChange, onSuccess }: ApplyLeaveDialogPro
           </div>
 
           {totalDays > 0 && (
-            <div className="text-sm text-muted-foreground">
-              Total days: {totalDays}
-            </div>
+            <div className="text-sm text-muted-foreground">Total days: {totalDays}</div>
           )}
 
           <div>
@@ -171,12 +162,8 @@ const ApplyLeaveDialog = ({ open, onOpenChange, onSuccess }: ApplyLeaveDialogPro
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Submitting..." : "Submit Leave Request"}
-            </Button>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>Cancel</Button>
+            <Button type="submit" disabled={isLoading}>{isLoading ? "Submitting..." : "Submit Leave Request"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

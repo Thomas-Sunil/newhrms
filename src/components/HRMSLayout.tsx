@@ -10,17 +10,20 @@ import {
   Clock,
   Settings,
   LogOut,
-  Shield
+  Shield,
+  FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import ApplyLeaveDialog from "@/components/ApplyLeaveDialog";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: BarChart3 },
   { name: "Departments", href: "/departments", icon: Building2 },
   { name: "Employees", href: "/employees", icon: Users },
   { name: "Attendance", href: "/attendance", icon: Clock },
+  { name: "Leave Management", href: "/leave-management", icon: Clock },
   { name: "Employment History", href: "/history", icon: Clock },
   { name: "Policies", href: "/policies", icon: Shield },
   { name: "Profile", href: "/profile", icon: User },
@@ -28,6 +31,7 @@ const navigation = [
 
 const HRMSLayout = ({ children }: { children: React.ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [applyLeaveDialogOpen, setApplyLeaveDialogOpen] = useState(false);
   const { employee, signOut } = useAuth();
 
   const handleSignOut = async () => {
@@ -95,8 +99,8 @@ const HRMSLayout = ({ children }: { children: React.ReactNode }) => {
                 }
                 
                 // Show Departments and Employees only to HR Managers and CXO
-                if (item.href === '/departments' || item.href === '/employees' || item.href === '/attendance') {
-                  return userRole === 'HR Manager' || userRole === 'CXO';
+                if (item.href === '/departments' || item.href === '/employees' || item.href === '/attendance' || item.href === '/leave-management') {
+                  return userRole === 'HR Manager' || userRole === 'CXO' || userRole === 'Department Head';
                 }
                 
                 // Show Employment History only to HR Managers and CXO
@@ -123,6 +127,14 @@ const HRMSLayout = ({ children }: { children: React.ReactNode }) => {
 
           {/* Footer Actions */}
           <div className="px-4 py-4 border-t border-white/10 space-y-2">
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start text-primary-foreground hover:bg-white/10"
+              onClick={() => setApplyLeaveDialogOpen(true)}
+            >
+              <FileText className="mr-3 h-4 w-4" />
+              Apply for Leave
+            </Button>
             <Button 
               variant="ghost" 
               className="w-full justify-start text-primary-foreground hover:bg-white/10"
@@ -171,6 +183,11 @@ const HRMSLayout = ({ children }: { children: React.ReactNode }) => {
           </div>
         </main>
       </div>
+      <ApplyLeaveDialog
+        open={applyLeaveDialogOpen}
+        onOpenChange={setApplyLeaveDialogOpen}
+        onSuccess={() => { /* Optionally refresh data or show toast */ }}
+      />
     </div>
   );
 };
