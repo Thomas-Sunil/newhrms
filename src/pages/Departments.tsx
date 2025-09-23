@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import CreateDepartmentDialog from "@/components/CreateDepartmentDialog";
 import EditDepartmentDialog from "@/components/EditDepartmentDialog";
 import HRMSLayout from "@/components/HRMSLayout";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Department {
   dept_id: string;
@@ -26,6 +27,9 @@ const Departments = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
   const { toast } = useToast();
+  const { employee } = useAuth();
+
+  const isHROrCXO = employee?.roles?.role_name === 'HR Manager' || employee?.roles?.role_name === 'CXO';
 
   useEffect(() => {
     fetchDepartments();
@@ -119,20 +123,24 @@ const Departments = () => {
                 <div className="flex items-center justify-between">
                   <Building2 className="h-8 w-8 text-primary" />
                   <div className="flex space-x-2">
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => handleEditDepartment(dept)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => handleDeleteDepartment(dept.dept_id, dept.dept_name)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {isHROrCXO && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleEditDepartment(dept)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {isHROrCXO && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleDeleteDepartment(dept.dept_id, dept.dept_name)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
                 <CardTitle>{dept.dept_name}</CardTitle>

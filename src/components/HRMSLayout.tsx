@@ -99,7 +99,11 @@ const HRMSLayout = ({ children }: { children: React.ReactNode }) => {
                 }
                 
                 // Show Departments and Employees only to HR Managers and CXO
-                if (item.href === '/departments' || item.href === '/employees' || item.href === '/attendance' || item.href === '/leave-management') {
+                if (item.href === '/departments' || item.href === '/employees') {
+                  return userRole === 'HR Manager' || userRole === 'CXO';
+                }
+                // Show Attendance and Leave Management to HR Managers, CXO, and Department Heads
+                if (item.href === '/attendance' || item.href === '/leave-management') {
                   return userRole === 'HR Manager' || userRole === 'CXO' || userRole === 'Department Head';
                 }
                 
