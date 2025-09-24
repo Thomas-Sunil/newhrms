@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Building2, Users, UserCheck, Crown, TrendingUp, Calendar, Clock, FileText, UserPlus, Shield, User } from "lucide-react";
+import { Building2, Users, UserCheck, Crown, TrendingUp, Calendar, Clock, FileText, UserPlus, Shield, User, Briefcase, History } from "lucide-react";
 import DashboardCard from "@/components/DashboardCard";
 import LoginForm from "@/components/LoginForm";
 import SetupCEO from "@/pages/SetupCEO";
@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import CreateEmployeeDialog from "@/components/CreateEmployeeDialog";
 import AssignDepartmentHeadDialog from "@/components/AssignDepartmentHeadDialog";
@@ -18,6 +19,8 @@ import HRAttendanceTable from "@/components/HRAttendanceTable";
 import AttendanceTable from "@/components/AttendanceTable";
 import EmployeeAttendanceCard from "@/components/EmployeeAttendanceCard";
 import { Badge } from "@/components/ui/badge";
+import EmployeeHistory from "@/components/EmployeeHistory";
+import { CreateDesignationDialog } from "@/components/CreateDesignationDialog";
 
 interface DashboardData {
   totalDepartments: number;
@@ -88,6 +91,8 @@ const Index = () => {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [createDesignationDialogOpen, setCreateDesignationDialogOpen] = useState(false);
+  const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
   const [selectedLeave, setSelectedLeave] = useState<LeaveRequest | null>(null);
   const [employeeType, setEmployeeType] = useState<'HR' | 'CXO' | 'Employee' | 'Department Head'>('Employee');
@@ -97,8 +102,8 @@ const Index = () => {
   const userRole = employee?.roles?.role_name;
   const isHROrCXO = userRole === 'HR Manager' || userRole === 'CXO';
   const isDeptHead = userRole === 'Department Head';
-  const isTeamLead = userRole === 'Team Lead'; // New flag
-  const isEmployee = userRole === 'Employee' || userRole === 'Team Lead'; // Modified to include Team Lead
+  const isTeamLead = false; // Team Lead role removed from leave workflow
+  const isEmployee = userRole === 'Employee';
 
   // Check if CEO exists in database
   const checkCEOExists = async () => {
@@ -317,7 +322,7 @@ const Index = () => {
           supabase
             .from('leave_requests')
             .select(`*, employees!leave_requests_emp_id_fkey(first_name, last_name, username)`)
-            .eq('status', 'tl_approved') // Department Heads review tl_approved
+            .eq('status', 'pending_dept_review') // Department Heads now review pending_dept_review
             .order('created_at', { ascending: false })
         ]);
 
@@ -336,46 +341,7 @@ const Index = () => {
         }
       }
 
-      if (isTeamLead && employee?.emp_id) { // New block for Team Lead
-  console.log('Index Page: Team Lead - Current User Employee ID:', employee.emp_id);
-  // Team Lead: Get team data (employees reporting to this lead) and leaves
-  const [teamRes, leavesRes] = await Promise.all([
-    supabase
-      .from('employees')
-      .select(`
-        *,
-        roles!role_id(role_name),
-        designations!designation_id(designation_name),
-        departments!department_id(dept_name)
-      `)
-      .eq('reporting_manager_id', employee.emp_id) // Filter by reporting_manager_id
-      .eq('status', 'active')
-      .order('first_name'),
-
-    supabase
-      .from('leave_requests')
-      .select(`*, employees!leave_requests_emp_id_fkey(first_name, last_name, username)`)
-      .eq('status', 'pending_tl_review') // Team Leads review pending_tl_review
-      .order('created_at', { ascending: false })
-  ]);
-
-  if (!teamRes.error) {
-    console.log('Index Page: Team Lead - Fetched Team Employees Data (teamRes.data):', teamRes.data);
-    const teamLeaves = (leavesRes.data || []).filter((leave: any) =>
-      (teamRes.data || []).some((emp: any) => emp.emp_id === leave.emp_id)
-    );
-    setPendingLeaves(teamLeaves);
-    setEmployees(teamRes.data || []); // This sets the 'employees' state that is passed to AttendanceTable
-    console.log('Index Page: Team Lead - Employees state after setEmployees:', employees);
-
-    additionalData = {
-      teamMembers: (teamRes.data || []).length,
-      presentToday: Math.floor((teamRes.data || []).length * 0.8), // Placeholder for now
-      pendingLeaveRequests: teamLeaves.filter((leave: any) => leave.status === 'pending').length
-    };
-  }
-}
-
+      
       if (isEmployee) {
         // Employee: Get own leave data
         const { data: leaveData } = await supabase
@@ -526,31 +492,7 @@ const Index = () => {
       ];
     }
 
-    if (isTeamLead) { // New block for Team Lead
-      return [
-        {
-          title: "Team Members",
-          value: (dashboardData.teamMembers || 0).toString(),
-          change: { value: "Your team", trend: "neutral" as const },
-          icon: Users,
-          variant: "primary" as const
-        },
-        {
-          title: "Present Today",
-          value: (dashboardData.presentToday || 0).toString(),
-          change: { value: "Active now", trend: "up" as const },
-          icon: UserCheck,
-          variant: "secondary" as const
-        },
-        {
-          title: "Pending Requests",
-          value: (dashboardData.pendingLeaveRequests || 0).toString(),
-          change: { value: "Need review", trend: "neutral" as const },
-          icon: FileText,
-          variant: "warning" as const
-        }
-      ];
-    }
+
 
     return baseStats;
   };
@@ -567,7 +509,6 @@ const Index = () => {
             <h1 className="text-3xl font-bold">
               {isHROrCXO ? 'Executive Dashboard' : 
                isDeptHead ? 'Department Head Dashboard' : 
-               isTeamLead ? 'Team Lead Dashboard' : 
                'Employee Dashboard'}
             </h1>
             <p className="text-muted-foreground">
@@ -606,6 +547,14 @@ const Index = () => {
                 <Button onClick={() => handleCreateEmployee('CXO')}>
                   <Crown className="mr-2 h-4 w-4" />
                   Add Executive
+                </Button>
+                <Button onClick={() => setCreateDesignationDialogOpen(true)} variant="outline">
+                  <Briefcase className="mr-2 h-4 w-4" />
+                  Add Designation
+                </Button>
+                <Button onClick={() => setShowHistoryDialog(true)} variant="outline">
+                  <History className="mr-2 h-4 w-4" />
+                  Employee History
                 </Button>
               </div>
             )}
@@ -774,82 +723,7 @@ const Index = () => {
           </>
         )}
 
-        {isTeamLead && ( // New block for Team Lead Content
-          <>
-            {/* Team Lead Content - Mirroring Department Head for now */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Calendar className="mr-2 h-5 w-5" />
-                    Pending Leave Requests
-                  </CardTitle>
-                  <CardDescription>
-                    Leave requests requiring your review
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {pendingLeaves.filter(leave => leave.status === 'pending').length > 0 ? (
-                    pendingLeaves
-                      .filter(leave => leave.status === 'pending')
-                      .slice(0, 5)
-                      .map((leave) => (
-                        <div key={leave.leave_id} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div>
-                            <p className="font-medium">
-                              {leave.employees?.first_name} {leave.employees?.last_name}
-                            </p>
-                            <p className="text-sm text-muted-foreground capitalize">
-                              {leave.leave_type} - {leave.total_days} days
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(leave.start_date).toLocaleDateString()} - {new Date(leave.end_date).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleOpenReviewDialog(leave)}
-                          >
-                            Review
-                          </Button>
-                        </div>
-                      ))
-                  ) : (
-                    <div className="text-sm text-muted-foreground text-center py-4">
-                      No pending leave requests
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Users className="mr-2 h-5 w-5" />
-                    Your Team
-                  </CardTitle>
-                  <CardDescription>
-                    Team overview
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-8">
-                    <Users className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <h3 className="mt-2 text-sm font-semibold">Team Overview</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {dashboardData.teamMembers || 0} team members • {dashboardData.presentToday || 0} present today
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Team Attendance */}
-            <AttendanceTable teamEmployees={employees} />
-          </>
-        )}
-
+        
         {isEmployee && (
           <>
             {/* Employee Content */}
@@ -890,12 +764,17 @@ const Index = () => {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Employee History Section */}
+            <EmployeeHistory 
+              selectedEmployeeId={employee?.emp_id} 
+              showAllEmployees={false}
+            />
           </>
         )}
 
         {/* Common sections for all authenticated users */}
-        {!isTeamLead && ( // Hide for Team Leads
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
             <Card>
               <CardHeader>
@@ -918,7 +797,6 @@ const Index = () => {
               </CardContent>
             </Card>
           </div>
-        )}
 
         {/* Dialogs */}
         {isHROrCXO && (
@@ -936,7 +814,25 @@ const Index = () => {
               department={selectedDepartment}
               onSuccess={fetchData}
             />
+
+            <CreateDesignationDialog
+              open={createDesignationDialogOpen}
+              onOpenChange={setCreateDesignationDialogOpen}
+              onSuccess={fetchData}
+            />
           </>
+        )}
+
+        {/* Employee History Dialog for HR/CXO */}
+        {isHROrCXO && (
+          <Dialog open={showHistoryDialog} onOpenChange={setShowHistoryDialog}>
+            <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>All Employees History</DialogTitle>
+              </DialogHeader>
+              <EmployeeHistory showAllEmployees={true} />
+            </DialogContent>
+          </Dialog>
         )}
 
         {isDeptHead && (
@@ -949,13 +845,13 @@ const Index = () => {
           />
         )}
 
-        {isTeamLead && ( // Added for Team Lead
-          <LeaveReviewDialog
-            open={reviewDialogOpen}
-            onOpenChange={setReviewDialogOpen}
-            leaveRequest={selectedLeave}
+
+
+        {isEmployee && (
+          <ApplyLeaveDialog
+            open={leaveDialogOpen}
+            onOpenChange={setLeaveDialogOpen}
             onSuccess={fetchData}
-            reviewType="team_lead" // Assuming a new reviewType for Team Lead
           />
         )}
       </div>

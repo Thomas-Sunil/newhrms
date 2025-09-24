@@ -195,6 +195,15 @@ const Employees = () => {
                         <Edit className="h-4 w-4" />
                       </Button>
                     )}
+                    {(isHROrCXO || (isDeptHead && emp.department_id === currentUser?.department_id) || (isTeamLead && emp.reporting_manager_id === currentUser?.emp_id)) && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleEditEmployee(emp)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    )}
                     {(isHROrCXO || (isDeptHead && emp.department_id === currentUser?.department_id) || (isTeamLead && emp.reporting_manager_id === currentUser?.emp_id)) && currentUser?.emp_id !== emp.emp_id && (
                       <Button 
                         variant="ghost" 

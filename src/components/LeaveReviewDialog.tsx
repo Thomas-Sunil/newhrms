@@ -29,7 +29,7 @@ interface LeaveReviewDialogProps {
   onOpenChange: (open: boolean) => void;
   leaveRequest: LeaveRequest | null;
   onSuccess: () => void;
-  reviewType: 'team_lead' | 'dept_head' | 'hr';
+  reviewType: 'dept_head' | 'hr';
 }
 
 const LeaveReviewDialog = ({ open, onOpenChange, leaveRequest, onSuccess, reviewType }: LeaveReviewDialogProps) => {
@@ -50,12 +50,7 @@ const LeaveReviewDialog = ({ open, onOpenChange, leaveRequest, onSuccess, review
       let reviewerField: string;
       let reviewDateField: string;
 
-      if (reviewType === 'team_lead') {
-        newStatus = action === 'approve' ? 'tl_approved' : 'tl_rejected';
-        commentsField = 'team_lead_comments';
-        reviewerField = 'reviewed_by_team_lead';
-        reviewDateField = 'tl_review_date';
-      } else if (reviewType === 'dept_head') {
+      if (reviewType === 'dept_head') {
         newStatus = action === 'approve' ? 'dept_approved' : 'dept_rejected';
         commentsField = 'dept_head_comments';
         reviewerField = 'reviewed_by_dept_head';
@@ -104,9 +99,7 @@ const LeaveReviewDialog = ({ open, onOpenChange, leaveRequest, onSuccess, review
 
   const getStatusBadge = (status: string) => {
     const statusConfig: { [key: string]: { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' } } = {
-      pending_tl_review: { label: "Pending TL Review", variant: "secondary" },
-      tl_approved: { label: "TL Approved", variant: "default" },
-      tl_rejected: { label: "TL Rejected", variant: "destructive" },
+      pending_dept_review: { label: "Pending Dept Review", variant: "secondary" },
       dept_approved: { label: "Dept Approved", variant: "default" },
       dept_rejected: { label: "Dept Rejected", variant: "destructive" },
       approved: { label: "Approved", variant: "default" },
@@ -122,8 +115,7 @@ const LeaveReviewDialog = ({ open, onOpenChange, leaveRequest, onSuccess, review
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>
-            {reviewType === 'team_lead' ? 'Team Lead Review' :
-             reviewType === 'dept_head' ? 'Department Head Review' : 'HR Review'} - Leave Request
+            {reviewType === 'dept_head' ? 'Department Head Review' : 'HR Review'} - Leave Request
           </DialogTitle>
           <DialogDescription>
             Review and approve/reject the leave request
@@ -178,8 +170,7 @@ const LeaveReviewDialog = ({ open, onOpenChange, leaveRequest, onSuccess, review
 
           <div>
             <Label htmlFor="comments">
-              {reviewType === 'team_lead' ? 'Team Lead Comments' :
-               reviewType === 'dept_head' ? 'Department Head Comments' : 'HR Comments'} (Optional)
+              {reviewType === 'dept_head' ? 'Department Head Comments' : 'HR Comments'} (Optional)
             </Label>
             <Textarea
               id="comments"

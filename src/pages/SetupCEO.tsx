@@ -109,7 +109,7 @@ const SetupCEO = () => {
                     <strong>CEO account is ready!</strong><br />
                     You can log in with:<br />
                     Username: <code className="bg-green-100 px-1 rounded">ceo</code><br />
-                    Password: <code className="bg-green-100 px-1 rounded">Password123</code>
+                    Password: (Set during initial setup or via password reset)
                   </p>
                 </div>
                 <Button 
@@ -125,11 +125,11 @@ const SetupCEO = () => {
                   <p className="text-sm text-blue-800">
                     This will create a default CEO account with:<br />
                     • Username: <code className="bg-blue-100 px-1 rounded">ceo</code><br />
-                    • Password: <code className="bg-blue-100 px-1 rounded">Password123</code><br />
                     • Email: <code className="bg-blue-100 px-1 rounded">thomassunilpzr@gmail.com</code><br />
                     • Role: CXO<br />
                     • Department: Board of Directors<br /><br />
-                    <strong>Note:</strong> You can change the email to your real email address for testing.
+                    <strong>Note:</strong> You can change the email to your real email address for testing.<br />
+                    The password will be set during the initial setup process.
                   </p>
                 </div>
                 

@@ -16,7 +16,6 @@ interface AttendanceCalendarProps {
 const AttendanceCalendar = ({ attendanceRecords, month, onMonthChange }: AttendanceCalendarProps) => {
 
   const lowerCaseFirst = (str: string) => str.charAt(0).toLowerCase() + str.slice(1);
-
   const modifiers = {
     present: attendanceRecords
       .filter(r => r.status.toLowerCase() === 'present')

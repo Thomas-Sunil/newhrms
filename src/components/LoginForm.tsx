@@ -50,47 +50,6 @@ const LoginForm = () => {
     setIsLoading(false);
   };
 
-  const handleResetCEO = async () => {
-    setIsResetting(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('bootstrap-ceo', {
-        body: { email: 'thomassunilpzr@gmail.com' },
-      });
-      if (error) throw error;
-      toast({
-        title: 'CEO Reset',
-        description: "CEO account recreated and email auto-confirmed. Use 'ceo' / 'Password123' to sign in.",
-      });
-    } catch (err: any) {
-      toast({
-        title: 'Error',
-        description: err.message || 'Failed to reset CEO account',
-        variant: 'destructive',
-      });
-    }
-    setIsResetting(false);
-  };
-
-  const handleResetHR = async () => {
-    setIsResetting(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('reset-hr', {
-        body: { email: 'hr@company.com', password: 'Pasword123' },
-      });
-      if (error) throw error;
-      toast({
-        title: 'HR Reset',
-        description: "HR account recreated. Use 'hr' / 'Pasword123' to sign in.",
-      });
-    } catch (err: any) {
-      toast({
-        title: 'Error',
-        description: err.message || 'Failed to reset HR account',
-        variant: 'destructive',
-      });
-    }
-    setIsResetting(false);
-  };
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-hero p-4">
       <div className="w-full max-w-md">
@@ -152,44 +111,6 @@ const LoginForm = () => {
                 {isLoading ? "Signing In..." : "Sign In"}
               </Button>
             </form>
-
-            {/* Demo credentials hint */}
-            <div className="mt-6 p-4 bg-muted/50 rounded-lg space-y-4">
-              <div className="text-sm text-muted-foreground text-center space-y-2">
-                <p><strong>Available Demo Accounts:</strong></p>
-                
-                <div className="bg-white/80 p-2 rounded border">
-                  <strong>CEO Account:</strong><br />
-                  Username: <code className="bg-muted px-1 rounded">ceo</code><br />
-                  Password: <code className="bg-muted px-1 rounded">Password123</code>
-                </div>
-                
-                <div className="bg-white/80 p-2 rounded border">
-                  <strong>HR Manager Account:</strong><br />
-                  Username: <code className="bg-muted px-1 rounded">hr</code><br />
-                  Password: <code className="bg-muted px-1 rounded">Pasword123</code>
-                </div>
-              </div>
-              
-              <div className="flex gap-2 justify-center">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={handleResetCEO}
-                  disabled={isResetting}
-                >
-                  {isResetting ? 'Resetting...' : 'Reset CEO'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={handleResetHR}
-                  disabled={isResetting}
-                >
-                  {isResetting ? 'Resetting...' : 'Reset HR'}
-                </Button>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>

@@ -69,13 +69,11 @@ const ApplyLeaveDialog = ({ open, onOpenChange, onSuccess }: ApplyLeaveDialogPro
     try {
       const totalDays = calculateDays(formData.startDate, formData.endDate);
       
-      let initialStatus = 'pending_tl_review'; // Default for regular employees
+      let initialStatus = 'pending_dept_review'; // Default for regular employees
       const applicantRole = employee?.roles?.role_name;
 
-      if (applicantRole === 'Team Lead') {
-        initialStatus = 'tl_approved'; // Team Lead auto-approves their own TL stage
-      } else if (applicantRole === 'Department Head') {
-        initialStatus = 'dept_approved'; // Department Head auto-approves TL and DH stages
+      if (applicantRole === 'Department Head') {
+        initialStatus = 'dept_approved'; // Department Head auto-approves DH stage
       } else if (applicantRole === 'HR Manager' || applicantRole === 'CXO') {
         initialStatus = 'approved'; // HR/CXO auto-approves all stages
       }
