@@ -57,11 +57,11 @@ const CreateEmployeeDialog = ({ open, onOpenChange, employeeType, onSuccess }: C
       // Auto-fill designation based on employee type
       const designationMap = {
         'HR': 'HR Manager',
-        'CXO': 'CXO', 
+        'CXO': 'CXO',
         'Department Head': 'Department Head',
         'Employee': '' // No auto-fill for regular employees
       };
-      
+
       setFormData(prev => ({
         ...prev,
         // Reset form but keep auto-filled designation
@@ -87,11 +87,11 @@ const CreateEmployeeDialog = ({ open, onOpenChange, employeeType, onSuccess }: C
     if (designations.length > 0) {
       const designationMap = {
         'HR': 'HR Manager',
-        'CXO': 'CXO', 
+        'CXO': 'CXO',
         'Department Head': 'Department Head',
         'Employee': '' // No auto-fill for regular employees
       };
-      
+
       const targetDesignationName = designationMap[employeeType];
       if (targetDesignationName) {
         const targetDesignation = designations.find(d => d.designation_name === targetDesignationName);
@@ -109,9 +109,9 @@ const CreateEmployeeDialog = ({ open, onOpenChange, employeeType, onSuccess }: C
     try {
       const [deptResult, roleResult, desigResult] = await Promise.all([
         supabase.from('departments').select('*').order('dept_name'),
-        supabase.from('roles').select('*').eq('role_name', 
-          employeeType === 'HR' ? 'HR Manager' : 
-          employeeType === 'CXO' ? 'CXO' : 
+        supabase.from('roles').select('*').eq('role_name',
+          employeeType === 'HR' ? 'HR Manager' :
+          employeeType === 'CXO' ? 'CXO' :
           employeeType === 'Department Head' ? 'Department Head' : 'Employee'
         ),
         supabase.from('designations').select('*').order('designation_name')
@@ -135,11 +135,11 @@ const CreateEmployeeDialog = ({ open, onOpenChange, employeeType, onSuccess }: C
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.username) {
+
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.username || !formData.doj) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields",
+        description: "Please fill in all required fields (First Name, Last Name, Email, Username, Joining Date)",
         variant: "destructive"
       });
       return;
@@ -194,17 +194,17 @@ const CreateEmployeeDialog = ({ open, onOpenChange, employeeType, onSuccess }: C
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="w-11/12 max-w-[90vw] sm:max-w-[500px] md:max-w-[600px] lg:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create {
-            employeeType === 'HR' ? 'HR Manager' : 
-            employeeType === 'CXO' ? 'CXO' : 
+            employeeType === 'HR' ? 'HR Manager' :
+            employeeType === 'CXO' ? 'CXO' :
             employeeType === 'Department Head' ? 'Department Head' : 'Employee'
           }</DialogTitle>
           <DialogDescription>
             Add a new {
-              employeeType === 'HR' ? 'HR Manager' : 
-              employeeType === 'CXO' ? 'CXO' : 
+              employeeType === 'HR' ? 'HR Manager' :
+              employeeType === 'CXO' ? 'CXO' :
               employeeType === 'Department Head' ? 'Department Head' : 'Employee'
             } to your organization.
             <br /><br />
@@ -213,7 +213,8 @@ const CreateEmployeeDialog = ({ open, onOpenChange, employeeType, onSuccess }: C
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
+            {/* First Name & Last Name */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="firstName">First Name *</Label>
                 <Input
@@ -233,7 +234,8 @@ const CreateEmployeeDialog = ({ open, onOpenChange, employeeType, onSuccess }: C
                 />
               </div>
             </div>
-            
+
+            {/* Email */}
             <div>
               <Label htmlFor="email">Email *</Label>
               <Input
@@ -249,6 +251,7 @@ const CreateEmployeeDialog = ({ open, onOpenChange, employeeType, onSuccess }: C
               </p>
             </div>
 
+            {/* Username */}
             <div>
               <Label htmlFor="username">Username *</Label>
               <Input
@@ -263,6 +266,7 @@ const CreateEmployeeDialog = ({ open, onOpenChange, employeeType, onSuccess }: C
               </p>
             </div>
 
+            {/* Password */}
             <div>
               <Label htmlFor="password">Password</Label>
               <Input
@@ -273,6 +277,7 @@ const CreateEmployeeDialog = ({ open, onOpenChange, employeeType, onSuccess }: C
               />
             </div>
 
+            {/* Department */}
             <div>
               <Label htmlFor="department">Department</Label>
               <Select value={formData.departmentId} onValueChange={(value) => setFormData(prev => ({ ...prev, departmentId: value }))}>
@@ -289,10 +294,11 @@ const CreateEmployeeDialog = ({ open, onOpenChange, employeeType, onSuccess }: C
               </Select>
             </div>
 
+            {/* Designation */}
             <div>
               <Label htmlFor="designation">Designation {employeeType !== 'Employee' ? '(Auto-filled)' : ''}</Label>
-              <Select 
-                value={formData.designationId} 
+              <Select
+                value={formData.designationId}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, designationId: value }))}
                 disabled={employeeType !== 'Employee'} // Disable for specific employee types
               >
@@ -309,7 +315,8 @@ const CreateEmployeeDialog = ({ open, onOpenChange, employeeType, onSuccess }: C
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            {/* Phone & Salary */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="phone">Phone</Label>
                 <Input
@@ -333,7 +340,8 @@ const CreateEmployeeDialog = ({ open, onOpenChange, employeeType, onSuccess }: C
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            {/* Gender & DOB */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="gender">Gender</Label>
                 <Select value={formData.gender} onValueChange={(value) => setFormData(prev => ({ ...prev, gender: value }))}>
@@ -359,6 +367,7 @@ const CreateEmployeeDialog = ({ open, onOpenChange, employeeType, onSuccess }: C
               </div>
             </div>
 
+            {/* Joining Date */}
             <div>
               <Label htmlFor="doj">Joining Date *</Label>
               <Input
@@ -374,6 +383,7 @@ const CreateEmployeeDialog = ({ open, onOpenChange, employeeType, onSuccess }: C
               </p>
             </div>
 
+            {/* Address */}
             <div>
               <Label htmlFor="address">Address</Label>
               <Input
@@ -385,11 +395,11 @@ const CreateEmployeeDialog = ({ open, onOpenChange, employeeType, onSuccess }: C
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-0 mt-4"> {/* Responsive footer */}
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading} className="w-full sm:w-auto sm:ml-2">
               {isLoading ? "Creating..." : `Create ${employeeType}`}
             </Button>
           </DialogFooter>
