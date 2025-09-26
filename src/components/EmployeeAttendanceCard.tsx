@@ -6,22 +6,22 @@ import { Clock, Calendar } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import AttendanceCalendar, { AttendanceRecord as CalendarAttendanceRecord } from "@/components/AttendanceCalendar"; // Import AttendanceCalendar
+import AttendanceCalendar, { AttendanceRecord as CalendarAttendanceRecord } from "@/components/AttendanceCalendar";
 
 const EmployeeAttendanceCard = () => {
   const [clockedIn, setClockedIn] = useState(false);
   const [todayAttendance, setTodayAttendance] = useState<any>(null);
-  const [monthlyAttendanceRecords, setMonthlyAttendanceRecords] = useState<CalendarAttendanceRecord[]>([]); // New state for monthly records
-  const [currentMonth, setCurrentMonth] = useState(new Date()); // New state for current month
+  const [monthlyAttendanceRecords, setMonthlyAttendanceRecords] = useState<CalendarAttendanceRecord[]>([]);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const { employee: currentUser } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
     if (currentUser) {
-      fetchAttendanceData(currentMonth); // Fetch for current month
+      fetchAttendanceData(currentMonth);
     }
-  }, [currentUser, currentMonth]); // Add currentMonth to dependency array
+  }, [currentUser, currentMonth]);
 
   const fetchAttendanceData = async (month: Date) => {
     if (!currentUser?.emp_id) return;
@@ -41,27 +41,39 @@ const EmployeeAttendanceCard = () => {
 
       if (attError) throw attError;
 
-      // Fetch approved leave requests for the month
-      const { data: leaveRequests, error: leaveError } = await supabase
-        .from('leave_requests')
-        .select('start_date, end_date')
-        .eq('emp_id', currentUser.emp_id)
-        .in('status', ['approved', 'dept_approved', 'tl_approved']) // Consider all approved stages
-        .gte('start_date', startOfMonth)
-        .lte('end_date', endOfMonth);
+      // Try to fetch approved leave requests using leave_applications table
+      let leaveRequests = null;
+      try {
+        const { data: leaveData, error: leaveError } = await supabase
+          .from('leave_applications')
+          .select('start_date, end_date, status')
+          .eq('employee_id', currentUser.emp_id) // Changed from emp_id to employee_id
+          .in('status', ['approved', 'dept_approved', 'tl_approved'])
+          .gte('start_date', startOfMonth.split('T')[0]) // Use date format for date columns
+          .lte('end_date', endOfMonth.split('T')[0]);
 
-      if (leaveError) throw leaveError;
-
-      const leaveDates = new Set<string>();
-      (leaveRequests || []).forEach(req => {
-        let currentDate = new Date(req.start_date);
-        const endDate = new Date(req.end_date);
-        while (currentDate <= endDate) {
-          leaveDates.add(currentDate.toISOString().split('T')[0]);
-          currentDate.setDate(currentDate.getDate() + 1);
+        if (!leaveError && leaveData) {
+          leaveRequests = leaveData;
         }
-      });
+      } catch (leaveError) {
+        console.warn("Could not fetch leave data, proceeding without:", leaveError);
+        leaveRequests = null;
+      }
 
+      // Create set of leave dates
+      const leaveDates = new Set<string>();
+      if (leaveRequests) {
+        leaveRequests.forEach(req => {
+          let currentDate = new Date(req.start_date);
+          const endDate = new Date(req.end_date);
+          while (currentDate <= endDate) {
+            leaveDates.add(currentDate.toISOString().split('T')[0]);
+            currentDate.setDate(currentDate.getDate() + 1);
+          }
+        });
+      }
+
+      // Generate monthly attendance records
       const formattedRecords: CalendarAttendanceRecord[] = [];
       const allDaysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
 
@@ -70,27 +82,28 @@ const EmployeeAttendanceCard = () => {
         const dayString = day.toISOString().split('T')[0];
         const attendanceRecord = (attendanceRecords || []).find(rec => rec.date === dayString);
 
-        let status: 'Present' | 'Absent' | 'On Leave' | 'No Record' = 'No Record'; // New default status
+        let status: 'Present' | 'Absent' | 'On Leave' | 'No Record' = 'No Record';
 
         if (leaveDates.has(dayString)) {
           status = 'On Leave';
         } else if (attendanceRecord) {
-          if (attendanceRecord.status === 'present' || attendanceRecord.status === 'clocked_out') {
+          // Focus on clock_in for Present status (as requested)
+          if (attendanceRecord.clock_in) {
             status = 'Present';
-          } else if (attendanceRecord.status === 'absent') { // Explicitly absent
+          } else if (attendanceRecord.status === 'absent') {
             status = 'Absent';
           }
         }
-        // If no attendanceRecord and not on leave, it remains 'No Record'
 
         formattedRecords.push({
           date: day,
           status: status,
         });
       }
+
       setMonthlyAttendanceRecords(formattedRecords);
 
-      // Also update today's attendance
+      // Update today's attendance
       const today = new Date().toISOString().split('T')[0];
       const todayRecord = attendanceRecords?.find(record => record.date === today);
       setTodayAttendance(todayRecord);
@@ -131,7 +144,7 @@ const EmployeeAttendanceCard = () => {
       if (error) throw error;
 
       setClockedIn(true);
-      fetchAttendanceData(currentMonth); // Refresh data for the month
+      fetchAttendanceData(currentMonth);
       toast({
         title: "Clocked In",
         description: "You have successfully clocked in for today"
@@ -165,7 +178,7 @@ const EmployeeAttendanceCard = () => {
       if (error) throw error;
 
       setClockedIn(false);
-      fetchAttendanceData(currentMonth); // Refresh data for the month
+      fetchAttendanceData(currentMonth);
       toast({
         title: "Clocked Out",
         description: "You have successfully clocked out"
