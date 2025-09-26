@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import HRMSLayout from "@/components/HRMSLayout";
 import { Eye, CheckCircle, XCircle, Clock } from "lucide-react";
 
 interface LeaveRequest {
@@ -216,6 +217,7 @@ const LeaveManagement = () => {
     setError(null);
     
     try {
+      // Apply basic filtering for regular employees at query level
       let query = supabase
         .from('leave_applications')
         .select(`
@@ -231,7 +233,6 @@ const LeaveManagement = () => {
         `)
         .order('created_at', { ascending: false });
 
-      // Apply basic filtering for regular employees at query level
       if (!isDeptHead && !isHR && !isCXO) {
         // Regular employees see only their own requests
         query = query.eq('employee_id', currentUser?.emp_id);
@@ -421,19 +422,19 @@ const LeaveManagement = () => {
     if (employeeRole === 'HR Manager') {
       return (
         <div className="text-xs text-muted-foreground">
-          Workflow: HR → Auto Approved
+          
         </div>
       );
     } else if (employeeRole === 'Department Head') {
       return (
         <div className="text-xs text-muted-foreground">
-          Workflow: Dept Head → HR Review
+          
         </div>
       );
     } else {
       return (
         <div className="text-xs text-muted-foreground">
-          Workflow: Employee → Dept Head → HR
+          
         </div>
       );
     }
@@ -441,95 +442,99 @@ const LeaveManagement = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <HRMSLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </HRMSLayout>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Leave Management</h1>
-        <p className="text-muted-foreground">
-          {isDeptHead && "Review leave requests from your department"}
-          {isHR && "Review department-approved leave requests"}
-          {isCXO && "View all leave requests"}
-          {!isDeptHead && !isHR && !isCXO && "Your leave requests"}
-        </p>
-      </div>
-
-      {error && (
-        <div className="bg-destructive/10 border border-destructive text-destructive p-4 rounded-lg">
-          {error}
+    <HRMSLayout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Leave Management</h1>
+          <p className="text-muted-foreground">
+            {isDeptHead && "Review leave requests from your department"}
+            {isHR && "Review department-approved leave requests"}
+            {isCXO && "View all leave requests"}
+            {!isDeptHead && !isHR && !isCXO && "Your leave requests"}
+          </p>
         </div>
-      )}
 
-      {leaveRequests.length === 0 && !loading && (
-        <Card>
-          <CardContent className="text-center py-8">
-            <p className="text-muted-foreground">No leave requests found.</p>
-          </CardContent>
-        </Card>
-      )}
+        {error && (
+          <div className="bg-destructive/10 border border-destructive text-destructive p-4 rounded-lg">
+            {error}
+          </div>
+        )}
 
-      <div className="grid gap-4">
-        {leaveRequests.map((request) => (
-          <Card key={request.id}>
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="text-lg">
-                    {request.employee?.first_name} {request.employee?.last_name}
-                  </CardTitle>
-                  <CardDescription>
-                    {request.employee?.username} • {request.department?.dept_name} • {request.role?.role_name}
-                  </CardDescription>
-                  {getWorkflowInfo(request)}
-                </div>
-                <div className="flex items-center space-x-2">
-                  {getStatusBadge(request.status)}
-                  {getActionButton(request)}
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                <div>
-                  <Label className="text-xs text-muted-foreground">Leave Type</Label>
-                  <p className="text-sm font-medium">{request.leave_category?.name || 'N/A'}</p>
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Duration</Label>
-                  <p className="text-sm font-medium">{request.total_days} days</p>
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Start Date</Label>
-                  <p className="text-sm font-medium">{new Date(request.start_date).toLocaleDateString()}</p>
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">End Date</Label>
-                  <p className="text-sm font-medium">{new Date(request.end_date).toLocaleDateString()}</p>
-                </div>
-              </div>
-              
-              <div>
-                <Label className="text-xs text-muted-foreground">Reason</Label>
-                <p className="text-sm bg-muted p-3 rounded-lg mt-1">{request.reason}</p>
-              </div>
+        {leaveRequests.length === 0 && !loading && (
+          <Card>
+            <CardContent className="text-center py-8">
+              <p className="text-muted-foreground">No leave requests found.</p>
             </CardContent>
           </Card>
-        ))}
-      </div>
+        )}
 
-      <ReviewDialog
-        open={reviewDialogOpen}
-        onOpenChange={setReviewDialogOpen}
-        leaveRequest={selectedLeave}
-        onSuccess={fetchLeaveRequests}
-        reviewerRole={isDeptHead ? 'Department Head' : 'HR Manager'}
-      />
-    </div>
+        <div className="grid gap-4">
+          {leaveRequests.map((request) => (
+            <Card key={request.id}>
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-lg">
+                      {request.employee?.first_name} {request.employee?.last_name}
+                    </CardTitle>
+                    <CardDescription>
+                      {request.employee?.username} • {request.department?.dept_name} • {request.role?.role_name}
+                    </CardDescription>
+                    {getWorkflowInfo(request)}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {getStatusBadge(request.status)}
+                    {getActionButton(request)}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Leave Type</Label>
+                    <p className="text-sm font-medium">{request.leave_category?.name || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Duration</Label>
+                    <p className="text-sm font-medium">{request.total_days} days</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Start Date</Label>
+                    <p className="text-sm font-medium">{new Date(request.start_date).toLocaleDateString()}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">End Date</Label>
+                    <p className="text-sm font-medium">{new Date(request.end_date).toLocaleDateString()}</p>
+                  </div>
+                </div>
+                
+                <div>
+                  <Label className="text-xs text-muted-foreground">Reason</Label>
+                  <p className="text-sm bg-muted p-3 rounded-lg mt-1">{request.reason}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <ReviewDialog
+          open={reviewDialogOpen}
+          onOpenChange={setReviewDialogOpen}
+          leaveRequest={selectedLeave}
+          onSuccess={fetchLeaveRequests}
+          reviewerRole={isDeptHead ? 'Department Head' : 'HR Manager'}
+        />
+      </div>
+    </HRMSLayout>
   );
 };
 

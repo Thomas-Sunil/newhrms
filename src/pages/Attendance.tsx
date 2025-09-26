@@ -93,13 +93,13 @@ const Attendance = () => {
           return;
         }
 
-        // 2. Try to fetch leave data from leave_requests table (using employee_id)
+        // 2. Try to fetch leave data from leave_applications table
         let leaveData = null;
         try {
           const { data: leaveResult, error: leaveError } = await supabase
-            .from('leave_requests')
+            .from('leave_applications')
             .select('start_date, end_date, status')
-            .eq('employee_id', selectedEmployeeId) // Fixed: using employee_id instead of emp_id
+            .eq('employee_id', selectedEmployeeId)
             .in('status', ['approved', 'dept_approved', 'tl_approved']);
 
           if (!leaveError && leaveResult) {
@@ -111,44 +111,8 @@ const Attendance = () => {
             });
           }
         } catch (leaveError) {
-          console.warn("Could not fetch from leave_requests table:", leaveError);
-          
-          // Try alternative tables: emp_leave_requests or leave_applications
-          try {
-            const { data: altLeaveResult, error: altLeaveError } = await supabase
-              .from('emp_leave_requests')
-              .select('start_date, end_date, status')
-              .eq('emp_id', selectedEmployeeId)
-              .in('status', ['approved', 'dept_approved', 'tl_approved']);
-
-            if (!altLeaveError && altLeaveResult) {
-              leaveData = altLeaveResult.filter(leave => {
-                const leaveStart = new Date(leave.start_date);
-                const leaveEnd = new Date(leave.end_date);
-                return leaveStart <= endDate && leaveEnd >= startDate;
-              });
-            }
-          } catch (altError) {
-            // Try leave_applications table
-            try {
-              const { data: appLeaveResult, error: appLeaveError } = await supabase
-                .from('leave_applications')
-                .select('start_date, end_date, status')
-                .eq('employee_id', selectedEmployeeId)
-                .in('status', ['approved', 'dept_approved', 'tl_approved']);
-
-              if (!appLeaveError && appLeaveResult) {
-                leaveData = appLeaveResult.filter(leave => {
-                  const leaveStart = new Date(leave.start_date);
-                  const leaveEnd = new Date(leave.end_date);
-                  return leaveStart <= endDate && leaveEnd >= startDate;
-                });
-              }
-            } catch (finalError) {
-              console.warn("No leave tables accessible, proceeding without leave data");
-              leaveData = null;
-            }
-          }
+          console.warn("Could not fetch leave data:", leaveError);
+          leaveData = null;
         }
 
         // 3. Process the data

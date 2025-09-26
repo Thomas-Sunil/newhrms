@@ -433,7 +433,7 @@ const Index = () => {
       {
         title: "Total Departments",
         value: dashboardData.totalDepartments.toString(),
-        change: { value: " ", trend: "up" as const },
+        change: { value: "", trend: "up" as const },
         icon: Building2,
         variant: "primary" as const
       },
@@ -503,61 +503,88 @@ const Index = () => {
   return (
     <HRMSLayout>
       <div className="space-y-6">
-        {/* Header with Clock In/Out */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">
-              {isHROrCXO ? 'Executive Dashboard' : 
-               isDeptHead ? 'Department Head Dashboard' : 
-               'Employee Dashboard'}
-            </h1>
-            <p className="text-muted-foreground">
-              Welcome back, {employee?.first_name}! Here's your overview for today.
-            </p>
-          </div>
-          <div className="flex items-center space-x-4">
-            {/* Clock Status */}
-            <div className="flex items-center space-x-2">
-              <div className={`w-3 h-3 rounded-full ${clockedIn ? 'bg-green-500' : 'bg-red-500'}`}></div>
-              <span className="text-sm font-medium">
-                {clockedIn ? 'Clocked In' : 'Clocked Out'}
-              </span>
-            </div>
-            
-            {/* Clock In/Out Button */}
-            {clockedIn ? (
-              <Button onClick={handleClockOut} variant="outline">
-                <Clock className="mr-2 h-4 w-4" />
-                Clock Out
-              </Button>
-            ) : (
-              <Button onClick={handleClockIn}>
-                <Clock className="mr-2 h-4 w-4" />
-                Clock In
-              </Button>
-            )}
+  {/* Header with Clock In/Out */}
+  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    
+    {/* Left: Title */}
+    <div>
+      <h1 className="text-2xl sm:text-3xl font-bold">
+        {isHROrCXO
+          ? 'Executive Dashboard'
+          : isDeptHead
+          ? 'Department Head Dashboard'
+          : 'Employee Dashboard'}
+      </h1>
+      <p className="text-sm sm:text-base text-muted-foreground">
+        Welcome back, {employee?.first_name}! Here's your overview for today.
+      </p>
+    </div>
 
-            {/* Role-specific actions */}
-            {isHROrCXO && (
-              <div className="flex space-x-2">
-                <Button onClick={() => handleCreateEmployee('Employee')} variant="outline">
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Add Employee
-                </Button>
-                <Button onClick={() => handleCreateEmployee('CXO')}>
-                  <Crown className="mr-2 h-4 w-4" />
-                  Add Executive
-                </Button>
-                <Button onClick={() => setCreateDesignationDialogOpen(true)} variant="outline">
-                  <Briefcase className="mr-2 h-4 w-4" />
-                  Add Designation
-                </Button>
-                <Button onClick={() => setShowHistoryDialog(true)} variant="outline">
-                  <History className="mr-2 h-4 w-4" />
-                  Employee History
-                </Button>
-              </div>
-            )}
+    {/* Right: Clock + Actions */}
+    <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 gap-3 w-full sm:w-auto">
+      
+      {/* Clock Status */}
+      <div className="flex items-center space-x-2">
+        <div
+          className={`w-3 h-3 rounded-full ${
+            clockedIn ? 'bg-green-500' : 'bg-red-500'
+          }`}
+        ></div>
+        <span className="text-sm font-medium">
+          {clockedIn ? 'Clocked In' : 'Clocked Out'}
+        </span>
+      </div>
+
+      {/* Clock Button */}
+      {clockedIn ? (
+        <Button onClick={handleClockOut} variant="outline" className="w-full sm:w-auto">
+          <Clock className="mr-2 h-4 w-4" />
+          Clock Out
+        </Button>
+      ) : (
+        <Button onClick={handleClockIn} className="w-full sm:w-auto">
+          <Clock className="mr-2 h-4 w-4" />
+          Clock In
+        </Button>
+      )}
+
+      {/* Role-specific actions */}
+      {isHROrCXO && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 w-full">
+          <Button
+            onClick={() => handleCreateEmployee('Employee')}
+            variant="outline"
+            className="w-full"
+          >
+            <UserPlus className="mr-2 h-4 w-4" />
+            Add Employee
+          </Button>
+          <Button
+            onClick={() => handleCreateEmployee('CXO')}
+            className="w-full"
+          >
+            <Crown className="mr-2 h-4 w-4" />
+            Add Executive
+          </Button>
+          <Button
+            onClick={() => setCreateDesignationDialogOpen(true)}
+            variant="outline"
+            className="w-full"
+          >
+            <Briefcase className="mr-2 h-4 w-4" />
+            Add Designation
+          </Button>
+          <Button
+            onClick={() => setShowHistoryDialog(true)}
+            variant="outline"
+            className="w-full"
+          >
+            <History className="mr-2 h-4 w-4" />
+            Employee History
+          </Button>
+        </div>
+      )}
+
 
             {isEmployee && (
               <Button onClick={() => setLeaveDialogOpen(true)}>
