@@ -291,12 +291,7 @@ const EmployeeHistory = ({ selectedEmployeeId, showAllEmployees = false }: Emplo
             Track role changes, salary revisions, and department transfers
           </CardDescription>
         </div>
-        {isHROrCXO && (
-          <Button onClick={() => setDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Update Employee
-          </Button>
-        )}
+ 
       </CardHeader>
       <CardContent>
         {loading ? (

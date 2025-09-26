@@ -433,14 +433,14 @@ const Index = () => {
       {
         title: "Total Departments",
         value: dashboardData.totalDepartments.toString(),
-        change: { value: "+2 this month", trend: "up" as const },
+        change: { value: " ", trend: "up" as const },
         icon: Building2,
         variant: "primary" as const
       },
       {
         title: "Total Employees", 
         value: dashboardData.totalEmployees.toString(),
-        change: { value: "+23 this month", trend: "up" as const },
+        change: { value: " ", trend: "up" as const },
         icon: Users,
         variant: "secondary" as const
       }
@@ -452,14 +452,14 @@ const Index = () => {
         {
           title: "HR Managers",
           value: dashboardData.totalHRManagers.toString(),
-          change: { value: "No change", trend: "neutral" as const },
+          change: { value: " ", trend: "neutral" as const },
           icon: UserCheck,
           variant: "default" as const
         },
         {
           title: "CXOs",
           value: dashboardData.totalCXOs.toString(),
-          change: { value: "+1 this quarter", trend: "up" as const },
+          change: { value: " ", trend: "up" as const },
           icon: Crown,
           variant: "warning" as const
         }

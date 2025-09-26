@@ -1,9 +1,22 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,47 +28,50 @@ interface ApplyLeaveDialogProps {
   onSuccess: () => void;
 }
 
-interface LeaveType {
-  leave_type_id: string;
-  leave_name: string;
+interface LeaveCategory {
+  id: string;
+  name: string;
 }
 
 const ApplyLeaveDialog = ({ open, onOpenChange, onSuccess }: ApplyLeaveDialogProps) => {
   const [formData, setFormData] = useState({
-    leave_type_id: "",
+    leave_category_id: "",
     startDate: "",
     endDate: "",
-    reason: ""
+    reason: "",
   });
-  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
+  const [leaveCategories, setLeaveCategories] = useState<LeaveCategory[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const { employee } = useAuth();
 
+  // Fetch leave categories when dialog opens
   useEffect(() => {
-    const fetchLeaveTypes = async () => {
-      const { data, error } = await supabase.from('leave_types').select('*');
-      if (data) setLeaveTypes(data);
+    const fetchCategories = async () => {
+      const { data, error } = await supabase.from("leave_categories").select("*");
+      if (error) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      } else {
+        setLeaveCategories(data || []);
+      }
     };
-    if (open) {
-      fetchLeaveTypes();
-    }
-  }, [open]);
+    if (open) fetchCategories();
+  }, [open, toast]);
 
+  // Calculate total leave days
   const calculateDays = (start: string, end: string) => {
     if (!start || !end) return 0;
-    const startDate = new Date(start);
-    const endDate = new Date(end);
-    const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    return diffDays;
+    const s = new Date(start);
+    const e = new Date(end);
+    const diff = e.getTime() - s.getTime();
+    return diff >= 0 ? Math.floor(diff / (1000 * 60 * 60 * 24)) + 1 : 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.leave_type_id || !formData.startDate || !formData.endDate || !formData.reason) {
-      toast({ title: "Error", description: "Please fill in all required fields", variant: "destructive" });
+
+    if (!formData.leave_category_id || !formData.startDate || !formData.endDate || !formData.reason) {
+      toast({ title: "Error", description: "All fields are required", variant: "destructive" });
       return;
     }
 
@@ -65,40 +81,29 @@ const ApplyLeaveDialog = ({ open, onOpenChange, onSuccess }: ApplyLeaveDialogPro
     }
 
     setIsLoading(true);
-    
+
     try {
       const totalDays = calculateDays(formData.startDate, formData.endDate);
-      
-      let initialStatus = 'pending_dept_review'; // Default for regular employees
-      const applicantRole = employee?.roles?.role_name;
 
-      if (applicantRole === 'Department Head') {
-        initialStatus = 'dept_approved'; // Department Head auto-approves DH stage
-      } else if (applicantRole === 'HR Manager' || applicantRole === 'CXO') {
-        initialStatus = 'approved'; // HR/CXO auto-approves all stages
-      }
-
-      const { error } = await supabase
-        .from('leave_requests')
-        .insert({
-          emp_id: employee?.emp_id,
-          leave_type_id: formData.leave_type_id,
-          start_date: formData.startDate,
-          end_date: formData.endDate,
-          total_days: totalDays,
-          reason: formData.reason,
-          status: initialStatus
-        });
+      const { error } = await supabase.from("leave_applications").insert({
+        employee_id: employee?.emp_id,
+        leave_category_id: formData.leave_category_id,
+        start_date: formData.startDate,
+        end_date: formData.endDate,
+        total_days: totalDays,
+        reason: formData.reason,
+        status: "pending",
+      });
 
       if (error) throw error;
 
-      toast({ title: "Success", description: "Leave request submitted successfully" });
-      
-      setFormData({ leave_type_id: "", startDate: "", endDate: "", reason: "" });
+      toast({ title: "Success", description: "Leave application submitted successfully" });
+
+      setFormData({ leave_category_id: "", startDate: "", endDate: "", reason: "" });
       onOpenChange(false);
-      onSuccess();
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to submit leave request", variant: "destructive" });
+      onSuccess(); // 🔥 refreshes leave list
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Something went wrong", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -111,24 +116,31 @@ const ApplyLeaveDialog = ({ open, onOpenChange, onSuccess }: ApplyLeaveDialogPro
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Apply for Leave</DialogTitle>
-          <DialogDescription>Submit a new leave request for approval</DialogDescription>
+          <DialogDescription>Fill in the form to request leave</DialogDescription>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Leave Type */}
           <div>
-            <Label htmlFor="leave_type_id">Leave Type *</Label>
-            <Select value={formData.leave_type_id} onValueChange={(value) => setFormData(prev => ({ ...prev, leave_type_id: value }))}>
+            <Label htmlFor="leave_category_id">Leave Type *</Label>
+            <Select
+              value={formData.leave_category_id}
+              onValueChange={(val) => setFormData((prev) => ({ ...prev, leave_category_id: val }))}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select leave type" />
               </SelectTrigger>
               <SelectContent>
-                {leaveTypes.map(lt => (
-                  <SelectItem key={lt.leave_type_id} value={lt.leave_type_id}>{lt.leave_name}</SelectItem>
+                {leaveCategories.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
+          {/* Dates */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="startDate">Start Date *</Label>
@@ -136,9 +148,9 @@ const ApplyLeaveDialog = ({ open, onOpenChange, onSuccess }: ApplyLeaveDialogPro
                 id="startDate"
                 type="date"
                 value={formData.startDate}
-                onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
+                onChange={(e) => setFormData((p) => ({ ...p, startDate: e.target.value }))}
                 disabled={isLoading}
-                min={new Date().toISOString().split('T')[0]}
+                min={new Date().toISOString().split("T")[0]}
               />
             </div>
             <div>
@@ -147,32 +159,38 @@ const ApplyLeaveDialog = ({ open, onOpenChange, onSuccess }: ApplyLeaveDialogPro
                 id="endDate"
                 type="date"
                 value={formData.endDate}
-                onChange={(e) => setFormData(prev => ({ ...prev, endDate: e.target.value }))}
+                onChange={(e) => setFormData((p) => ({ ...p, endDate: e.target.value }))}
                 disabled={isLoading}
-                min={formData.startDate || new Date().toISOString().split('T')[0]}
+                min={formData.startDate || new Date().toISOString().split("T")[0]}
               />
             </div>
           </div>
 
+          {/* Total days */}
           {totalDays > 0 && (
             <div className="text-sm text-muted-foreground">Total days: {totalDays}</div>
           )}
 
+          {/* Reason */}
           <div>
             <Label htmlFor="reason">Reason *</Label>
             <Textarea
               id="reason"
               value={formData.reason}
-              onChange={(e) => setFormData(prev => ({ ...prev, reason: e.target.value }))}
+              onChange={(e) => setFormData((p) => ({ ...p, reason: e.target.value }))}
               disabled={isLoading}
-              placeholder="Please provide reason for leave"
+              placeholder="State your reason"
               rows={3}
             />
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>Cancel</Button>
-            <Button type="submit" disabled={isLoading}>{isLoading ? "Submitting..." : "Submit Leave Request"}</Button>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? "Submitting..." : "Submit Request"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

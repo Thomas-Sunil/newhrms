@@ -45,26 +45,76 @@ const Profile = () => {
   const canManageSalary = employee?.roles?.role_name === 'HR Manager' || employee?.roles?.role_name === 'CXO';
 
   useEffect(() => {
-    const fetchLeaveRequests = async () => {
-      if (!employee?.emp_id) return;
-      const { data, error } = await supabase
-        .from('leave_requests')
-        .select(`
-          *,
-          leave_types(leave_name)
-        `)
-        .eq('emp_id', employee.emp_id)
-        .order('created_at', { ascending: false });
+  const fetchLeaveRequests = async () => {
+    if (!employee?.emp_id) return;
+    
+    try {
+      // Fetch leave applications
+      const { data: leaveData, error: leaveError } = await supabase
+        .from('leave_applications')
+        .select('id, leave_category_id, start_date, end_date, total_days, reason, status, created_at')
+        .eq('employee_id', employee.emp_id)
+        .order('created_at', { ascending: false })
+        .limit(10);
 
-      if (error) {
-        console.error("Error fetching leave requests:", error);
-      } else {
-        setLeaveRequests(data as LeaveRequest[]);
+      if (leaveError) throw leaveError;
+
+      if (!leaveData || leaveData.length === 0) {
+        setLeaveRequests([]);
+        return;
       }
-    };
-    fetchLeaveRequests();
-  }, [employee?.emp_id]);
 
+      // Get unique leave category IDs
+      const categoryIds = [...new Set(leaveData.map(req => req.leave_category_id).filter(Boolean))];
+      
+      // Fetch leave categories
+      let categoryMap = new Map();
+      if (categoryIds.length > 0) {
+        const { data: categories, error: catError } = await supabase
+          .from('leave_categories')
+          .select('id, name')
+          .in('id', categoryIds);
+
+        if (!catError && categories) {
+          categoryMap = new Map(categories.map(cat => [cat.id, cat]));
+        }
+      }
+
+      // Transform data to match the interface
+      const transformedData = leaveData.map(req => ({
+        leave_id: req.id, // Map id to leave_id for compatibility
+        start_date: req.start_date,
+        end_date: req.end_date,
+        total_days: req.total_days,
+        reason: req.reason,
+        status: req.status,
+        leave_types: {
+          leave_name: req.leave_category_id ? categoryMap.get(req.leave_category_id)?.name || 'Leave Request' : 'Leave Request'
+        }
+      }));
+
+      setLeaveRequests(transformedData as LeaveRequest[]);
+    } catch (error) {
+      console.error("Error fetching leave requests:", error);
+      setLeaveRequests([]);
+    }
+  };
+  
+  fetchLeaveRequests();
+}, [employee?.emp_id]);
+
+// Also update the LeaveRequest interface at the top:
+interface LeaveRequest {
+  leave_id: string;
+  start_date: string;
+  end_date: string;
+  total_days: number;
+  reason: string;
+  status: string;
+  leave_types: {
+    leave_name: string;
+  };
+}
   const handleEdit = () => {
     setFormData({
       firstName: employee?.first_name || "",
@@ -388,28 +438,28 @@ const Profile = () => {
             </div>
 
             <div className="border-t pt-6">
-              <h3 className="text-lg font-semibold mb-4">My Leave Requests</h3>
-              {leaveRequests.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No leave requests found.</p>
-              ) : (
-                <div className="space-y-3">
-                  {leaveRequests.map(req => (
-                    <Card key={req.leave_id} className="p-3">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="text-sm font-medium">{req.leave_types.leave_name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(req.start_date).toLocaleDateString()} - {new Date(req.end_date).toLocaleDateString()} ({req.total_days} days)
-                          </p>
-                        </div>
-                        {getStatusBadge(req.status)}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-2">Reason: {req.reason}</p>
-                    </Card>
-                  ))}
-                </div>
-              )}
+  <h3 className="text-lg font-semibold mb-4">My Leave Requests</h3>
+  {leaveRequests.length === 0 ? (
+    <p className="text-sm text-muted-foreground">No leave requests found.</p>
+  ) : (
+    <div className="space-y-3">
+{leaveRequests.map(req => (
+  <Card key={req.leave_id} className="p-3">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-sm font-medium">{req.leave_category?.name || 'Leave Request'}</p>
+              <p className="text-xs text-muted-foreground">
+                {new Date(req.start_date).toLocaleDateString()} - {new Date(req.end_date).toLocaleDateString()} ({req.total_days} days)
+              </p>
             </div>
+            {getStatusBadge(req.status)}
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">Reason: {req.reason}</p>
+        </Card>
+      ))}
+    </div>
+  )}
+</div>
           </CardContent>
         </Card>
       </div>

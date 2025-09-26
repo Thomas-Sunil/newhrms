@@ -24,7 +24,7 @@ const navigation = [
   { name: "Employees", href: "/employees", icon: Users },
   { name: "Attendance", href: "/attendance", icon: Clock },
   { name: "Leave Management", href: "/leave-management", icon: Clock },
-  { name: "Employment History", href: "/history", icon: Clock },
+  
   { name: "Policies", href: "/policies", icon: Shield },
   { name: "Profile", href: "/profile", icon: User },
 ];
@@ -130,7 +130,7 @@ const HRMSLayout = ({ children }: { children: React.ReactNode }) => {
           </nav>
 
           {/* Footer Actions */}
-          <div className="px-4 py-4 border-t border-white/10 space-y-2">
+           <div className="px-4 py-4 border-t border-white/10 space-y-2">
             <Button 
               variant="ghost" 
               className="w-full justify-start text-primary-foreground hover:bg-white/10"
@@ -138,13 +138,6 @@ const HRMSLayout = ({ children }: { children: React.ReactNode }) => {
             >
               <FileText className="mr-3 h-4 w-4" />
               Apply for Leave
-            </Button>
-            <Button 
-              variant="ghost" 
-              className="w-full justify-start text-primary-foreground hover:bg-white/10"
-            >
-              <Settings className="mr-3 h-4 w-4" />
-              Settings
             </Button>
             <Button 
               variant="ghost" 

@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 
 export type AttendanceRecord = {
   date: Date;
-  status: 'Present' | 'Absent' | 'On Leave' | 'No Record'; // Added 'No Record'
+  status: 'Present' | 'Absent' | 'On Leave' | 'No Record';
 };
 
 interface AttendanceCalendarProps {
@@ -14,20 +14,18 @@ interface AttendanceCalendarProps {
 }
 
 const AttendanceCalendar = ({ attendanceRecords, month, onMonthChange }: AttendanceCalendarProps) => {
-
-  const lowerCaseFirst = (str: string) => str.charAt(0).toLowerCase() + str.slice(1);
   const modifiers = {
     present: attendanceRecords
-      .filter(r => r.status.toLowerCase() === 'present')
+      .filter(r => r.status === 'Present')
       .map(r => r.date),
     absent: attendanceRecords
-      .filter(r => r.status.toLowerCase() === 'absent')
+      .filter(r => r.status === 'Absent')
       .map(r => r.date),
     onLeave: attendanceRecords
-      .filter(r => r.status.toLowerCase() === 'on leave')
+      .filter(r => r.status === 'On Leave')
       .map(r => r.date),
-    noRecord: attendanceRecords // Added noRecord modifier
-      .filter(r => r.status.toLowerCase() === 'no record')
+    noRecord: attendanceRecords
+      .filter(r => r.status === 'No Record')
       .map(r => r.date),
   };
 
@@ -35,14 +33,14 @@ const AttendanceCalendar = ({ attendanceRecords, month, onMonthChange }: Attenda
     present: 'rdp-day_present',
     absent: 'rdp-day_absent',
     onLeave: 'rdp-day_onLeave',
-    noRecord: 'rdp-day_noRecord', // Added noRecord class name
+    noRecord: 'rdp-day_noRecord',
   };
 
   const legendItems = [
     { status: 'Present', className: 'bg-green-500' },
     { status: 'Absent', className: 'bg-red-500' },
-    { status: 'On Leave', className: 'bg-yellow-500' },
-    { status: 'No Record', className: 'bg-gray-300' }, // Added No Record to legend
+    { status: 'On Leave', className: 'bg-blue-500' },
+    { status: 'No Record', className: 'bg-gray-300' },
   ];
 
   return (
@@ -57,10 +55,10 @@ const AttendanceCalendar = ({ attendanceRecords, month, onMonthChange }: Attenda
           color: #991b1b; /* red-800 */
         }
         .rdp-day_onLeave, .rdp-day_onLeave:hover {
-          background-color: #fef9c3; /* yellow-200 */
-          color: #854d0e; /* yellow-800 */
+          background-color: #dbeafe; /* blue-200 */
+          color: #1e40af; /* blue-800 */
         }
-        .rdp-day_noRecord, .rdp-day_noRecord:hover { /* New style for No Record */
+        .rdp-day_noRecord, .rdp-day_noRecord:hover {
           background-color: #e0e0e0; /* gray-300 */
           color: #424242; /* gray-800 */
         }

@@ -15,8 +15,6 @@ interface Employee {
   reporting_manager_id?: string;
 }
 
-const TOP_LEVEL_ROLES = ['Department Head', 'HR Manager', 'CXO'];
-
 const Attendance = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
@@ -75,65 +73,139 @@ const Attendance = () => {
   useEffect(() => {
     if (!selectedEmployeeId) return;
 
-    const fetchFullAttendance = async () => {
+    const fetchAttendanceData = async () => {
       setLoading(true);
       const startDate = startOfMonth(currentMonth);
       const endDate = endOfMonth(currentMonth);
 
-      // 1. Fetch regular attendance records
-      const { data: attendanceData, error: attendanceError } = await supabase
-        .from('attendance')
-        .select('date, status, clock_out') 
-        .eq('emp_id', selectedEmployeeId)
-        .gte('date', format(startDate, 'yyyy-MM-dd'))
-        .lte('date', format(endDate, 'yyyy-MM-dd'));
+      try {
+        // 1. Fetch attendance records - Primary focus
+        const { data: attendanceData, error: attendanceError } = await supabase
+          .from('attendance')
+          .select('date, status, clock_in, clock_out') 
+          .eq('emp_id', selectedEmployeeId)
+          .gte('date', format(startDate, 'yyyy-MM-dd'))
+          .lte('date', format(endDate, 'yyyy-MM-dd'));
 
-      // 2. Fetch approved leave requests
-      const { data: leaveData, error: leaveError } = await supabase
-        .from('leave_requests')
-        .select('start_date, end_date')
-        .eq('emp_id', selectedEmployeeId)
-        .eq('status', 'approved')
-        .lte('start_date', format(endDate, 'yyyy-MM-dd'))
-        .gte('end_date', format(startDate, 'yyyy-MM-dd'));
+        if (attendanceError) {
+          console.error("Error fetching attendance data:", attendanceError);
+          setLoading(false);
+          return;
+        }
 
-      if (attendanceError || leaveError) {
-        console.error("Error fetching attendance data", attendanceError, leaveError);
-        setLoading(false);
-        return;
-      }
+        // 2. Try to fetch leave data from leave_requests table (using employee_id)
+        let leaveData = null;
+        try {
+          const { data: leaveResult, error: leaveError } = await supabase
+            .from('leave_requests')
+            .select('start_date, end_date, status')
+            .eq('employee_id', selectedEmployeeId) // Fixed: using employee_id instead of emp_id
+            .in('status', ['approved', 'dept_approved', 'tl_approved']);
 
-      // 3. Merge the data
-      const recordsMap = new Map<string, AttendanceRecord>();
-
-      // Add leave days first, as they have priority
-      if (leaveData) {
-        leaveData.forEach(leave => {
-          const interval = eachDayOfInterval({
-            start: new Date(leave.start_date),
-            end: new Date(leave.end_date)
-          });
-          interval.forEach(day => {
-            recordsMap.set(format(day, 'yyyy-MM-dd'), { date: day, status: 'On Leave' });
-          });
-        });
-      }
-
-      // Add attendance records, avoiding overwriting leave days
-      if (attendanceData) {
-        attendanceData.forEach(att => {
-          if (!recordsMap.has(att.date)) {
-            const finalStatus = att.clock_out ? 'Present' : att.status;
-            recordsMap.set(att.date, { date: new Date(att.date), status: finalStatus as any });
+          if (!leaveError && leaveResult) {
+            // Filter for dates within the current month
+            leaveData = leaveResult.filter(leave => {
+              const leaveStart = new Date(leave.start_date);
+              const leaveEnd = new Date(leave.end_date);
+              return leaveStart <= endDate && leaveEnd >= startDate;
+            });
           }
-        });
-      }
+        } catch (leaveError) {
+          console.warn("Could not fetch from leave_requests table:", leaveError);
+          
+          // Try alternative tables: emp_leave_requests or leave_applications
+          try {
+            const { data: altLeaveResult, error: altLeaveError } = await supabase
+              .from('emp_leave_requests')
+              .select('start_date, end_date, status')
+              .eq('emp_id', selectedEmployeeId)
+              .in('status', ['approved', 'dept_approved', 'tl_approved']);
 
-      setAttendanceRecords(Array.from(recordsMap.values()));
-      setLoading(false);
+            if (!altLeaveError && altLeaveResult) {
+              leaveData = altLeaveResult.filter(leave => {
+                const leaveStart = new Date(leave.start_date);
+                const leaveEnd = new Date(leave.end_date);
+                return leaveStart <= endDate && leaveEnd >= startDate;
+              });
+            }
+          } catch (altError) {
+            // Try leave_applications table
+            try {
+              const { data: appLeaveResult, error: appLeaveError } = await supabase
+                .from('leave_applications')
+                .select('start_date, end_date, status')
+                .eq('employee_id', selectedEmployeeId)
+                .in('status', ['approved', 'dept_approved', 'tl_approved']);
+
+              if (!appLeaveError && appLeaveResult) {
+                leaveData = appLeaveResult.filter(leave => {
+                  const leaveStart = new Date(leave.start_date);
+                  const leaveEnd = new Date(leave.end_date);
+                  return leaveStart <= endDate && leaveEnd >= startDate;
+                });
+              }
+            } catch (finalError) {
+              console.warn("No leave tables accessible, proceeding without leave data");
+              leaveData = null;
+            }
+          }
+        }
+
+        // 3. Process the data
+        const recordsMap = new Map<string, AttendanceRecord>();
+
+        // Add leave days first (if available)
+        if (leaveData && leaveData.length > 0) {
+          leaveData.forEach(leave => {
+            try {
+              const interval = eachDayOfInterval({
+                start: new Date(leave.start_date),
+                end: new Date(leave.end_date)
+              });
+              interval.forEach(day => {
+                if (day >= startDate && day <= endDate) {
+                  recordsMap.set(format(day, 'yyyy-MM-dd'), { 
+                    date: day, 
+                    status: 'On Leave' 
+                  });
+                }
+              });
+            } catch (dateError) {
+              console.warn("Error processing leave dates:", dateError);
+            }
+          });
+        }
+
+        // Add attendance records - Focus on clock_in for Present status
+        if (attendanceData) {
+          attendanceData.forEach(att => {
+            if (!recordsMap.has(att.date)) {
+              let finalStatus: 'Present' | 'Absent' | 'On Leave' | 'No Record' = 'No Record';
+              
+              // Primary rule: If clocked in, mark as Present (regardless of clock out)
+              if (att.clock_in) {
+                finalStatus = 'Present';
+              } else if (att.status === 'absent') {
+                finalStatus = 'Absent';
+              }
+              
+              recordsMap.set(att.date, { 
+                date: new Date(att.date), 
+                status: finalStatus 
+              });
+            }
+          });
+        }
+
+        setAttendanceRecords(Array.from(recordsMap.values()));
+      } catch (error) {
+        console.error("Error fetching attendance data:", error);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    fetchFullAttendance();
+    fetchAttendanceData();
   }, [selectedEmployeeId, currentMonth]);
 
   const selectedEmployee = employees.find(e => e.emp_id === selectedEmployeeId);
