@@ -3,9 +3,16 @@ import { startOfMonth, endOfMonth, format, eachDayOfInterval } from 'date-fns';
 import HRMSLayout from "@/components/HRMSLayout";
 import AttendanceCalendar, { AttendanceRecord } from '@/components/AttendanceCalendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Calendar } from "@/components/ui/calendar";
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from "@/hooks/use-toast";
+import { Plus, CalendarDays } from "lucide-react";
 
 interface Employee {
   emp_id: string;
@@ -15,19 +22,51 @@ interface Employee {
   reporting_manager_id?: string;
 }
 
+interface Holiday {
+  id: string;
+  date: string;
+  reason: string;
+  created_by: string;
+  created_at: string;
+}
+
 const Attendance = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [loading, setLoading] = useState(false);
+  const [holidayDialogOpen, setHolidayDialogOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [holidayReason, setHolidayReason] = useState("");
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
   const { employee: currentUser } = useAuth();
+  const { toast } = useToast();
 
   const userRole = currentUser?.roles?.role_name;
   const isHROrCXO = userRole === 'HR Manager' || userRole === 'CXO';
   const isDeptHead = userRole === 'Department Head';
   const isTeamLead = userRole === 'Team Lead';
   const isRegularEmployee = userRole === 'Employee';
+
+  // Fetch holidays
+  const fetchHolidays = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('holidays')
+        .select('*')
+        .order('date', { ascending: true });
+
+      if (error) throw error;
+      setHolidays(data || []);
+    } catch (error) {
+      console.error("Error fetching holidays:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchHolidays();
+  }, []);
 
   useEffect(() => {
     const fetchEmployees = async () => {
@@ -41,16 +80,12 @@ const Attendance = () => {
       if (isHROrCXO) {
         // HR/CXO sees all employees
       } else if (isDeptHead && currentUser.department_id) {
-        // Department Head sees employees in their department
         query = query.eq('department_id', currentUser.department_id);
       } else if (isTeamLead && currentUser.emp_id) {
-        // Team Lead sees employees reporting to them
         query = query.eq('reporting_manager_id', currentUser.emp_id);
       } else if (isRegularEmployee && currentUser.emp_id) {
-        // Regular employee sees only themselves
         query = query.eq('emp_id', currentUser.emp_id);
       } else {
-        // Fallback for unhandled roles or missing data
         setEmployees([]);
         setSelectedEmployeeId(null);
         return;
@@ -79,7 +114,7 @@ const Attendance = () => {
       const endDate = endOfMonth(currentMonth);
 
       try {
-        // 1. Fetch attendance records - Primary focus
+        // 1. Fetch attendance records
         const { data: attendanceData, error: attendanceError } = await supabase
           .from('attendance')
           .select('date, status, clock_in, clock_out') 
@@ -93,7 +128,7 @@ const Attendance = () => {
           return;
         }
 
-        // 2. Try to fetch leave data from leave_applications table
+        // 2. Fetch leave data
         let leaveData = null;
         try {
           const { data: leaveResult, error: leaveError } = await supabase
@@ -103,7 +138,6 @@ const Attendance = () => {
             .in('status', ['approved', 'dept_approved', 'tl_approved']);
 
           if (!leaveError && leaveResult) {
-            // Filter for dates within the current month
             leaveData = leaveResult.filter(leave => {
               const leaveStart = new Date(leave.start_date);
               const leaveEnd = new Date(leave.end_date);
@@ -118,7 +152,18 @@ const Attendance = () => {
         // 3. Process the data
         const recordsMap = new Map<string, AttendanceRecord>();
 
-        // Add leave days first (if available)
+        // Add holidays first (highest priority)
+        holidays.forEach(holiday => {
+          const holidayDate = new Date(holiday.date);
+          if (holidayDate >= startDate && holidayDate <= endDate) {
+            recordsMap.set(format(holidayDate, 'yyyy-MM-dd'), {
+              date: holidayDate,
+              status: 'Holiday'
+            });
+          }
+        });
+
+        // Add leave days
         if (leaveData && leaveData.length > 0) {
           leaveData.forEach(leave => {
             try {
@@ -128,10 +173,12 @@ const Attendance = () => {
               });
               interval.forEach(day => {
                 if (day >= startDate && day <= endDate) {
-                  recordsMap.set(format(day, 'yyyy-MM-dd'), { 
-                    date: day, 
-                    status: 'On Leave' 
-                  });
+                  if (!recordsMap.has(format(day, 'yyyy-MM-dd'))) {
+                    recordsMap.set(format(day, 'yyyy-MM-dd'), { 
+                      date: day, 
+                      status: 'On Leave' 
+                    });
+                  }
                 }
               });
             } catch (dateError) {
@@ -140,13 +187,12 @@ const Attendance = () => {
           });
         }
 
-        // Add attendance records - Focus on clock_in for Present status
+        // Add attendance records
         if (attendanceData) {
           attendanceData.forEach(att => {
             if (!recordsMap.has(att.date)) {
-              let finalStatus: 'Present' | 'Absent' | 'On Leave' | 'No Record' = 'No Record';
+              let finalStatus: 'Present' | 'Absent' | 'On Leave' | 'Holiday' | 'No Record' = 'No Record';
               
-              // Primary rule: If clocked in, mark as Present (regardless of clock out)
               if (att.clock_in) {
                 finalStatus = 'Present';
               } else if (att.status === 'absent') {
@@ -170,16 +216,63 @@ const Attendance = () => {
     };
 
     fetchAttendanceData();
-  }, [selectedEmployeeId, currentMonth]);
+  }, [selectedEmployeeId, currentMonth, holidays]);
+
+  const handleAddHoliday = async () => {
+    if (!selectedDate || !holidayReason.trim()) {
+      toast({
+        title: "Error",
+        description: "Please select a date and provide a reason",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('holidays')
+        .insert({
+          date: format(selectedDate, 'yyyy-MM-dd'),
+          reason: holidayReason,
+          created_by: currentUser?.emp_id
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Holiday added successfully"
+      });
+
+      setHolidayReason("");
+      setSelectedDate(new Date());
+      setHolidayDialogOpen(false);
+      fetchHolidays();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to add holiday: " + error.message,
+        variant: "destructive"
+      });
+    }
+  };
 
   const selectedEmployee = employees.find(e => e.emp_id === selectedEmployeeId);
 
   return (
     <HRMSLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Employee Attendance</h1>
-          <p className="text-muted-foreground">Select an employee to view their monthly attendance.</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Employee Attendance</h1>
+            <p className="text-muted-foreground">Select an employee to view their monthly attendance.</p>
+          </div>
+          {isHROrCXO && (
+            <Button onClick={() => setHolidayDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Holiday
+            </Button>
+          )}
         </div>
 
         <Card>
@@ -219,6 +312,86 @@ const Attendance = () => {
             )}
           </div>
         </Card>
+
+        {/* Holiday List */}
+        {isHROrCXO && holidays.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <CalendarDays className="mr-2 h-5 w-5" />
+                Upcoming Holidays
+              </CardTitle>
+            </CardHeader>
+            <div className="p-4">
+              <div className="space-y-2">
+                {holidays
+                  .filter(h => new Date(h.date) >= new Date())
+                  .slice(0, 5)
+                  .map(holiday => (
+                    <div key={holiday.id} className="flex justify-between items-center p-2 border rounded">
+                      <div>
+                        <p className="font-medium">{holiday.reason}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {new Date(holiday.date).toLocaleDateString('en-US', { 
+                            weekday: 'long', 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Add Holiday Dialog */}
+        <Dialog open={holidayDialogOpen} onOpenChange={setHolidayDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Add Holiday</DialogTitle>
+              <DialogDescription>
+                Select a date and provide a reason for the holiday
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div>
+                <Label>Select Date</Label>
+                <div className="flex justify-center mt-2">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={setSelectedDate}
+                    className="rounded-md border"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="reason">Reason</Label>
+                <Textarea
+                  id="reason"
+                  value={holidayReason}
+                  onChange={(e) => setHolidayReason(e.target.value)}
+                  placeholder="e.g., Independence Day, Company Anniversary..."
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setHolidayDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddHoliday}>
+                Add Holiday
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </HRMSLayout>
   );

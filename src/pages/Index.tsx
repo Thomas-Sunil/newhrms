@@ -456,13 +456,7 @@ const Index = () => {
           icon: UserCheck,
           variant: "default" as const
         },
-        {
-          title: "CXOs",
-          value: dashboardData.totalCXOs.toString(),
-          change: { value: " ", trend: "up" as const },
-          icon: Crown,
-          variant: "warning" as const
-        }
+
       ];
     }
 
@@ -475,20 +469,7 @@ const Index = () => {
           icon: Users,
           variant: "primary" as const
         },
-        {
-          title: "Present Today",
-          value: (dashboardData.presentToday || 0).toString(),
-          change: { value: "Active now", trend: "up" as const },
-          icon: UserCheck,
-          variant: "secondary" as const
-        },
-        {
-          title: "Pending Requests",
-          value: (dashboardData.pendingLeaveRequests || 0).toString(),
-          change: { value: "Need review", trend: "neutral" as const },
-          icon: FileText,
-          variant: "warning" as const
-        }
+ 
       ];
     }
 

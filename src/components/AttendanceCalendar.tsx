@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 
 export type AttendanceRecord = {
   date: Date;
-  status: 'Present' | 'Absent' | 'On Leave' | 'No Record';
+  status: 'Present' | 'Absent' | 'On Leave' | 'Holiday' | 'No Record';
 };
 
 interface AttendanceCalendarProps {
@@ -24,22 +24,33 @@ const AttendanceCalendar = ({ attendanceRecords, month, onMonthChange }: Attenda
     onLeave: attendanceRecords
       .filter(r => r.status === 'On Leave')
       .map(r => r.date),
+    holiday: attendanceRecords
+      .filter(r => r.status === 'Holiday')
+      .map(r => r.date),
     noRecord: attendanceRecords
       .filter(r => r.status === 'No Record')
       .map(r => r.date),
+    weekend: (date: Date) => {
+      const day = date.getDay();
+      return day === 0 || day === 6; // 0 = Sunday, 6 = Saturday
+    }
   };
 
   const modifierClassNames = {
     present: 'rdp-day_present',
     absent: 'rdp-day_absent',
     onLeave: 'rdp-day_onLeave',
+    holiday: 'rdp-day_holiday',
     noRecord: 'rdp-day_noRecord',
+    weekend: 'rdp-day_weekend',
   };
 
   const legendItems = [
     { status: 'Present', className: 'bg-green-500' },
     { status: 'Absent', className: 'bg-red-500' },
     { status: 'On Leave', className: 'bg-blue-500' },
+    { status: 'Holiday', className: 'bg-orange-500' },
+    { status: 'Weekend', className: 'bg-purple-500' },
     { status: 'No Record', className: 'bg-gray-300' },
   ];
 
@@ -57,6 +68,14 @@ const AttendanceCalendar = ({ attendanceRecords, month, onMonthChange }: Attenda
         .rdp-day_onLeave, .rdp-day_onLeave:hover {
           background-color: #dbeafe; /* blue-200 */
           color: #1e40af; /* blue-800 */
+        }
+        .rdp-day_holiday, .rdp-day_holiday:hover {
+          background-color: #fed7aa; /* orange-200 */
+          color: #9a3412; /* orange-800 */
+        }
+        .rdp-day_weekend, .rdp-day_weekend:hover {
+          background-color: #f3e8ff; /* purple-200 */
+          color: #6b21a8; /* purple-800 */
         }
         .rdp-day_noRecord, .rdp-day_noRecord:hover {
           background-color: #e0e0e0; /* gray-300 */
