@@ -126,11 +126,17 @@ const EmployeeAttendanceCard = () => {
 
       setMonthlyAttendanceRecords(formattedRecords);
 
-      // Update today's attendance
+      // Update today's attendance (only if viewing current month)
       const today = new Date().toISOString().split('T')[0];
-      const todayRecord = attendanceRecords?.find(record => record.date === today);
-      setTodayAttendance(todayRecord);
-      setClockedIn(todayRecord?.clock_in && !todayRecord?.clock_out);
+      const isCurrentMonth = month.getMonth() === new Date().getMonth() && 
+                            month.getFullYear() === new Date().getFullYear();
+      
+      if (isCurrentMonth) {
+        const todayRecord = attendanceRecords?.find(record => record.date === today);
+        setTodayAttendance(todayRecord);
+        setClockedIn(todayRecord?.clock_in && !todayRecord?.clock_out);
+      }
+      // Don't update today's attendance if viewing a different month
 
     } catch (error: any) {
       console.error('Error fetching monthly attendance:', error);
