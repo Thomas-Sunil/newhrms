@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { History, Plus, Calendar, Building2, User, DollarSign } from "lucide-react";
+import { History, Plus, Calendar, Building2, User } from "lucide-react";
 
 interface EmployeeHistory {
   history_id: string;
@@ -353,7 +353,7 @@ const EmployeeHistory = ({ selectedEmployeeId, showAllEmployees = false }: Emplo
                           )}
                           {item.old_salary && (
                             <div className="flex items-center">
-                              <DollarSign className="mr-1 h-3 w-3" />
+                              
                               {formatCurrency(item.old_salary)}
                             </div>
                           )}
@@ -375,7 +375,7 @@ const EmployeeHistory = ({ selectedEmployeeId, showAllEmployees = false }: Emplo
                           )}
                           {item.new_salary && (
                             <div className="flex items-center">
-                              <DollarSign className="mr-1 h-3 w-3" />
+                              
                               {formatCurrency(item.new_salary)}
                             </div>
                           )}
