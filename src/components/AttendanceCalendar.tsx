@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 
 export type AttendanceRecord = {
   date: Date;
-  status: 'Present' | 'Absent' | 'On Leave' | 'Holiday' | 'No Record';
+  status: 'Present' | 'Absent' | 'On Leave' | 'Holiday' ;
 };
 
 interface AttendanceCalendarProps {
@@ -27,9 +27,6 @@ const AttendanceCalendar = ({ attendanceRecords, month, onMonthChange }: Attenda
     holiday: attendanceRecords
       .filter(r => r.status === 'Holiday')
       .map(r => r.date),
-    noRecord: attendanceRecords
-      .filter(r => r.status === 'No Record')
-      .map(r => r.date),
     weekend: (date: Date) => {
       const day = date.getDay();
       return day === 0 || day === 6; // 0 = Sunday, 6 = Saturday
@@ -41,7 +38,7 @@ const AttendanceCalendar = ({ attendanceRecords, month, onMonthChange }: Attenda
     absent: 'rdp-day_absent',
     onLeave: 'rdp-day_onLeave',
     holiday: 'rdp-day_holiday',
-    noRecord: 'rdp-day_noRecord',
+  
     weekend: 'rdp-day_weekend',
   };
 
@@ -51,7 +48,6 @@ const AttendanceCalendar = ({ attendanceRecords, month, onMonthChange }: Attenda
     { status: 'On Leave', className: 'bg-blue-500' },
     { status: 'Holiday', className: 'bg-orange-500' },
     { status: 'Weekend', className: 'bg-purple-500' },
-    { status: 'No Record', className: 'bg-gray-300' },
   ];
 
   return (

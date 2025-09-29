@@ -114,6 +114,49 @@ const Attendance = () => {
       const endDate = endOfMonth(currentMonth);
 
       try {
+        // Security check: Verify the selected employee is accessible to current user
+        if (isDeptHead && currentUser?.department_id) {
+          const { data: empCheck } = await supabase
+            .from('employees')
+            .select('department_id')
+            .eq('emp_id', selectedEmployeeId)
+            .single();
+          
+          if (empCheck?.department_id !== currentUser.department_id) {
+            toast({
+              title: "Access Denied",
+              description: "You can only view attendance of employees in your department",
+              variant: "destructive"
+            });
+            setLoading(false);
+            return;
+          }
+        } else if (isTeamLead && currentUser?.emp_id) {
+          const { data: empCheck } = await supabase
+            .from('employees')
+            .select('reporting_manager_id')
+            .eq('emp_id', selectedEmployeeId)
+            .single();
+          
+          if (empCheck?.reporting_manager_id !== currentUser.emp_id) {
+            toast({
+              title: "Access Denied",
+              description: "You can only view attendance of your team members",
+              variant: "destructive"
+            });
+            setLoading(false);
+            return;
+          }
+        } else if (isRegularEmployee && currentUser?.emp_id && selectedEmployeeId !== currentUser.emp_id) {
+          toast({
+            title: "Access Denied",
+            description: "You can only view your own attendance",
+            variant: "destructive"
+          });
+          setLoading(false);
+          return;
+        }
+
         // 1. Fetch attendance records
         const { data: attendanceData, error: attendanceError } = await supabase
           .from('attendance')

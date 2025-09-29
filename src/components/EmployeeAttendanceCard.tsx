@@ -100,6 +100,7 @@ const EmployeeAttendanceCard = () => {
         const day = new Date(month.getFullYear(), month.getMonth(), i);
         const dayString = day.toISOString().split('T')[0];
         const attendanceRecord = (attendanceRecords || []).find(rec => rec.date === dayString);
+        const dayOfWeek = day.getDay(); // 0 = Sunday, 6 = Saturday
 
         let status: 'Present' | 'Absent' | 'On Leave' | 'Holiday' | 'No Record' = 'No Record';
 
@@ -117,6 +118,8 @@ const EmployeeAttendanceCard = () => {
             status = 'Absent';
           }
         }
+        // Note: Weekends are handled by the calendar component's modifier
+        // So we don't set a 'Weekend' status here - the calendar applies weekend styling
 
         formattedRecords.push({
           date: day,
