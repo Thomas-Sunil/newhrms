@@ -14,6 +14,7 @@ const EmployeeAttendanceCard = () => {
   const [monthlyAttendanceRecords, setMonthlyAttendanceRecords] = useState<CalendarAttendanceRecord[]>([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [loading, setLoading] = useState(true);
+  const [holidays, setHolidays] = useState<any[]>([]); // Add holidays state
   const { employee: currentUser } = useAuth();
   const { toast } = useToast();
 
@@ -22,6 +23,24 @@ const EmployeeAttendanceCard = () => {
       fetchAttendanceData(currentMonth);
     }
   }, [currentUser, currentMonth]);
+
+  // Fetch holidays
+  useEffect(() => {
+    const fetchHolidays = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('holidays')
+          .select('*')
+          .order('date', { ascending: true });
+
+        if (error) throw error;
+        setHolidays(data || []);
+      } catch (error) {
+        console.error("Error fetching holidays:", error);
+      }
+    };
+    fetchHolidays();
+  }, []);
 
   const fetchAttendanceData = async (month: Date) => {
     if (!currentUser?.emp_id) return;
@@ -82,9 +101,13 @@ const EmployeeAttendanceCard = () => {
         const dayString = day.toISOString().split('T')[0];
         const attendanceRecord = (attendanceRecords || []).find(rec => rec.date === dayString);
 
-        let status: 'Present' | 'Absent' | 'On Leave' | 'No Record' = 'No Record';
+        let status: 'Present' | 'Absent' | 'On Leave' | 'Holiday' | 'No Record' = 'No Record';
 
-        if (leaveDates.has(dayString)) {
+        // Check if day is a holiday (highest priority)
+        const isHoliday = holidays.some(h => h.date === dayString);
+        if (isHoliday) {
+          status = 'Holiday';
+        } else if (leaveDates.has(dayString)) {
           status = 'On Leave';
         } else if (attendanceRecord) {
           // Focus on clock_in for Present status (as requested)
